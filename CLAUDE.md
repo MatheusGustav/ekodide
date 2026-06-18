@@ -94,6 +94,21 @@ pytest -q                                                       # testes (lacre,
    - *Auto-start:* um **atalho/serviço** pro `ekodide serve` subir sozinho no PC (no
      celular já sobe via Termux:Boot).
 
+3. **App nativo no celular (PENDENTE — decidido 2026-06-18).** Objetivo do Matheus: o
+   **admin (PC) dirige tudo** — puxa arquivo do celular e injeta no celular — com o
+   **celular PASSIVO**, sem a manha de instalar Termux/Python/ekodide.
+   - **Por que precisa de app (não dá pra fugir):** pro PC "entrar" no celular, o
+     celular tem que ser um **servidor** (escutar e expor arquivos). Navegador é
+     **cliente/visitante**, não vira servidor — então a ideia de portal web NÃO atende
+     esse desejo (o celular é que teria de tocar os botões). E auto-instalar de fora é
+     proibido pelo SO. Logo, **só um app instalado** transforma o celular num par
+     passivo que o admin comanda.
+   - **Tentativa revertida:** o portal web (`serve --web`) foi implementado e depois
+     **revertido** (commit `482ddc9` desfez o `9f4cd2f`) — resolvia "sem instalar", mas
+     deixava o celular ativo (cliente), o oposto do que o Matheus quer.
+   - **Quando for fazer:** app Android (e talvez iOS) que roda o papel de recebedor/
+     servidor; provavelmente fora do escopo "stdlib Python puro" — é outra stack.
+
 ## Notas de campo (provado em 2026-06-18)
 
 - Transferência **nos dois sentidos** por Wi-Fi, firewall ligado, sha256 idêntico.
