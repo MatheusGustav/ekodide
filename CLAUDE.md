@@ -81,11 +81,14 @@ pytest -q                                                       # testes (lacre,
      forte é gerado e ditado out-of-band (a frase É o segredo, nunca trafega). O
      `serve --host 0.0.0.0` já se anuncia sozinho. Escolhi broadcast caseiro em vez de
      mDNS/zeroconf pra manter o zero-dep.
-   - *Firewall:* ✅ **FEITO (2026-06-18).** `cortina.py` + `ekodide firewall` detecta
-     firewalld/ufw, diz quais portas (TCP 8778 + UDP 8779) faltam e abre com sudo
-     (`--abrir`); o `serve` avisa na hora se a porta parece fechada. Não abre nada
-     escondido (exige root → você autoriza). QR de verdade (imagem) ficou de fora
-     (pesado pro zero-dep) — a frase-código cobre o "PIN".
+   - *Firewall:* ✅ **FEITO (2026-06-18).** `cortina.py` + `ekodide firewall` detecta o
+     firewall e abre as portas (TCP 8778 + UDP 8779) com `--abrir`; o `serve` avisa na
+     hora se parece fechado. Não abre nada escondido (exige privilégio → você autoriza).
+     Cobre **Linux** (firewalld/ufw, por porta, sudo), **Windows** (netsh advfirewall,
+     por porta, precisa de Administrador) e **macOS** (Application Firewall: é por APP,
+     libera o `sys.executable`; vem desligado de fábrica → detecta o estado e só age se
+     ligado). Comandos conferidos contra docs oficiais (Microsoft/Apple). QR de verdade
+     (imagem) ficou de fora (pesado pro zero-dep) — a frase-código cobre o "PIN".
    - *Instalação:* avaliar um **zipapp single-file** (`ekodide.pyz`, roda só com
      Python, sem pip/pipx — viável porque é zero-dep) pra portabilidade instantânea.
    - *Auto-start:* um **atalho/serviço** pro `ekodide serve` subir sozinho no PC (no

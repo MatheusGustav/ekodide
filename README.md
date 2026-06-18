@@ -92,11 +92,14 @@ ekodide pair casa-vento-rio-azul-pedra-lobo   # RECEBE a frase ditada pelo outro
 ekodide pair --palavras 8    # frase mais longa (mais forte) ao gerar
 ```
 
-### `firewall` — liberar as portas (no lado que recebe)
+### `firewall` — liberar a entrada (no lado que recebe)
 ```bash
-ekodide firewall             # detecta firewalld/ufw, diz quais portas faltam e o comando
-ekodide firewall --abrir     # roda o comando pra liberar (pede sudo)
+ekodide firewall             # detecta o firewall, diz o que falta e mostra o comando
+ekodide firewall --abrir     # executa pra liberar (você autoriza)
 ```
+Sabe lidar com **Linux** (firewalld/ufw — por porta, pede sudo), **Windows** (netsh —
+por porta, precisa de um Prompt de Administrador) e **macOS** (Application Firewall —
+é por **aplicativo**, libera o Python; e costuma vir desligado, aí nem precisa).
 
 ### `serve` — receber (abrir a caixa)
 ```bash

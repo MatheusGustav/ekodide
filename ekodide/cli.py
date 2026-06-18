@@ -119,24 +119,47 @@ def _cmd_firewall(args) -> int:
     portas = cortina.portas()
     sistema = cortina.detectar()
     if sistema is None:
-        print("Não detectei firewalld nem ufw. Se houver firewall, libere no lado que RECEBE:")
-        print("  firewalld: sudo firewall-cmd --add-port=8778/tcp --add-port=8779/udp --permanent")
-        print("             && sudo systemctl restart firewalld")
-        print("  ufw:       sudo ufw allow 8778/tcp && sudo ufw allow 8779/udp")
+        print("Não reconheci o firewall. Se houver um, libere no lado que RECEBE:")
+        print("  Linux/firewalld: sudo firewall-cmd --add-port=8778/tcp --add-port=8779/udp")
+        print("                   --permanent && sudo systemctl restart firewalld")
+        print("  Linux/ufw:       sudo ufw allow 8778/tcp && sudo ufw allow 8779/udp")
+        print('  Windows (Admin): netsh advfirewall firewall add rule name="Ekodide 8778/tcp"')
+        print("                   dir=in action=allow protocol=TCP localport=8778  (idem 8779/UDP)")
         return 0
     print(f"Firewall detectado: {sistema}")
-    rotulo = {True: "liberada", False: "FECHADA", None: "?"}
-    for chave, ok in cortina.portas_liberadas(portas, sistema).items():
-        print(f"  {chave}: {rotulo[ok]}")
+
+    # macOS é POR APP (libera o Python), não por porta — e costuma vir desligado.
+    if cortina.por_aplicativo(sistema):
+        ligado = cortina.estado_macos()
+        if ligado is False:
+            print("  O firewall do Mac está DESLIGADO — nada bloqueia, não precisa abrir nada.")
+            return 0
+        print("  No Mac libera-se o PROGRAMA (o Python que roda o Ekodide), não a porta.")
+    else:
+        rotulo = {True: "liberada", False: "FECHADA", None: "?"}
+        for chave, ok in cortina.portas_liberadas(portas, sistema).items():
+            print(f"  {chave}: {rotulo[ok]}")
+
     if args.abrir:
-        print("Abrindo as portas (vai pedir sudo)…")
+        comoabre = "vai pedir sudo" if sistema != "netsh" else "precisa de um prompt de Administrador"
+        print(f"Liberando ({comoabre})…")
         rc = cortina.liberar(portas, sistema)
-        print("Pronto." if rc == 0 else "Algo falhou ao abrir — rode os comandos à mão.")
+        if rc == 0:
+            print("Pronto.")
+        elif sistema == "netsh":
+            print("Falhou — provável falta de Administrador. Abra o Prompt de Comando como")
+            print("Administrador e rode os comandos abaixo:")
+            for c in cortina.comandos(portas, sistema):
+                print(f"  {c}")
+        else:
+            print("Algo falhou ao abrir — rode os comandos à mão.")
         return rc
     print("\nPra liberar:")
     for c in cortina.comandos(portas, sistema):
         print(f"  {c}")
-    print("\n(ou rode:  ekodide firewall --abrir)")
+    nota = "  (no Windows, rode num Prompt de Administrador)" if sistema == "netsh" else \
+           "  (ou rode:  ekodide firewall --abrir)"
+    print(f"\n{nota}")
     return 0
 
 

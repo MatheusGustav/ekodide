@@ -28,6 +28,26 @@ def test_comandos_ufw():
     assert "sudo ufw allow 8779/udp" in cmds
 
 
+def test_comandos_windows_netsh():
+    cmds = cortina.comandos(cortina.portas(), sistema="netsh")
+    junto = " ".join(cmds)
+    assert "netsh advfirewall firewall add rule" in junto
+    assert "protocol=TCP localport=8778" in junto
+    assert "protocol=UDP localport=8779" in junto
+    assert 'name="Ekodide 8778/tcp"' in junto
+
+
+def test_comandos_macos_e_por_app_nao_porta():
+    cmds = cortina.comandos(cortina.portas(), sistema="macos")
+    junto = " ".join(cmds)
+    # libera o PROGRAMA (Python), não a porta: nada de 8778/8779 nos comandos
+    assert "socketfilterfw" in junto
+    assert "--add" in junto and "--unblockapp" in junto
+    assert "8778" not in junto and "8779" not in junto
+    assert cortina.por_aplicativo("macos") is True
+    assert cortina.por_aplicativo("netsh") is False
+
+
 def test_comandos_desconhecido_e_none():
     assert cortina.comandos(cortina.portas(), sistema="nada-disso") is None
 
