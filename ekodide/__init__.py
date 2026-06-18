@@ -27,6 +27,8 @@ from .lacre import (
     segredo_do_ambiente,
 )
 from .recebedor import servir
+from .vizinhanca import anunciar, anunciar_em_thread, procurar
+from .frase import gerar as gerar_frase
 
 __version__ = "0.1.0"
 
@@ -42,4 +44,8 @@ __all__ = [
     "segredo_do_ambiente",
     "TrancaInvalida",
     "JANELA_SEGUNDOS",
+    "anunciar",
+    "anunciar_em_thread",
+    "procurar",
+    "gerar_frase",
 ]

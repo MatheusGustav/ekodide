@@ -66,3 +66,21 @@ def test_config_show_mascara_segredo(capsys):
     cli.main(["config", "show"])
     saida = capsys.readouterr().out
     assert "super-secreto" not in saida and "guardado" in saida
+
+
+def test_pair_gera_frase_e_a_outra_ponta_recebe(capsys):
+    # ponta A gera: a frase fica guardada como segredo e aparece na saída
+    assert cli.main(["pair"]) == 0
+    saida = capsys.readouterr().out
+    assert "ekodide pair " in saida
+    frase_gerada = config.carregar()["segredo"]
+    assert frase_gerada in saida
+
+    # ponta B recebe a MESMA frase: os dois ficam com o segredo idêntico
+    assert cli.main(["pair", frase_gerada]) == 0
+    assert config.carregar()["segredo"] == frase_gerada
+
+
+def test_config_nome_grava(capsys):
+    assert cli.main(["config", "nome", "meu-pc"]) == 0
+    assert config.carregar()["nome"] == "meu-pc"

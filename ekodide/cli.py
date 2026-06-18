@@ -17,7 +17,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import config
+from . import config, frase, vizinhanca
 from .carteiro import enviar
 
 
@@ -49,13 +49,32 @@ def _registrar(para: str, origem: Path, rotulo: str) -> None:
         f.write(f"{carimbo}\t{para}\t{origem}\t{rotulo}\n")
 
 
+def _resolver_destino(nome: str, descobrir: bool) -> str:
+    """Acha a URL do destino. Sem --descobrir, a config vence (rápido). Se o nome não
+    está na config (ou --descobrir forçado), procura o aparelho na rede pelo nome —
+    assim funciona mesmo sem cadastrar IP e mesmo que o IP tenha mudado (DHCP)."""
+    if not descobrir:
+        try:
+            return config.url_do_destino(nome)
+        except config.ErroConfig:
+            pass  # não cadastrado — cai pra descoberta abaixo
+    print(f"Procurando '{nome}' na rede…", file=sys.stderr)
+    for aparelho in vizinhanca.procurar():
+        if aparelho["nome"] == nome:
+            return vizinhanca.url_de(aparelho)
+    raise config.ErroConfig(
+        f"Não achei '{nome}' (nem na config, nem na rede). "
+        f"Veja quem está disponível com:  ekodide devices"
+    )
+
+
 def _cmd_send(args) -> int:
     origem = Path(args.caminho).expanduser()
     if not origem.exists():
         print(f"Não achei: {origem}", file=sys.stderr)
         return 1
     try:
-        url = config.url_do_destino(args.para)
+        url = _resolver_destino(args.para, args.descobrir)
         segredo = config.segredo()
     except config.ErroConfig as erro:
         print(erro, file=sys.stderr)
@@ -83,7 +102,43 @@ def _cmd_serve(args) -> int:
     except config.ErroConfig as erro:
         print(erro, file=sys.stderr)
         return 1
+    # Se a caixa está aberta na LAN, anuncia presença pra outros acharem sem digitar IP.
+    if host != "127.0.0.1":
+        nome = config.nome_do_aparelho(cfg)
+        vizinhanca.anunciar_em_thread(nome, int(porta))
+        print(f"Anunciando como '{nome}' na rede (descoberta automática).")
     servir(Path(base).expanduser(), segredo, host=host, porta=int(porta))
+    return 0
+
+
+def _cmd_devices(args) -> int:
+    print("Procurando aparelhos Ekodide na rede…")
+    achados = vizinhanca.procurar(timeout=args.tempo)
+    if not achados:
+        print("Nenhum encontrado. (O outro lado está com 'ekodide serve --host 0.0.0.0'?)")
+        return 1
+    print(f"{len(achados)} aparelho(s):")
+    for ap in achados:
+        print(f"  {ap['nome']:<16} {vizinhanca.url_de(ap)}")
+    print("\nEnvie com:  ekodide send <arquivo> --para <nome>")
+    return 0
+
+
+def _cmd_pair(args) -> int:
+    cfg = config.carregar()
+    if args.frase:  # esta ponta RECEBE a frase ditada pela outra
+        cfg["segredo"] = args.frase
+        config.salvar(cfg)
+        print(f"Pareado. Segredo guardado em {config.caminho()} (cadeado 600).")
+        return 0
+    # esta ponta GERA a frase e a mostra pra ditar na outra
+    nova = frase.gerar(palavras=args.palavras)
+    cfg["segredo"] = nova
+    config.salvar(cfg)
+    print("Frase-código gerada e guardada AQUI. Digite-a no OUTRO aparelho:\n")
+    print(f"    ekodide pair {nova}\n")
+    print("Ela é o segredo (a chave do cadeado) — não trafega pela rede; passe pela")
+    print("tela/voz. Depois confira quem está on com:  ekodide devices")
     return 0
 
 
@@ -97,6 +152,10 @@ def _cmd_config(args) -> int:
         cfg.setdefault("destinos", {})[args.nome] = args.url
         config.salvar(cfg)
         print(f"Destino '{args.nome}' = {args.url}")
+    elif args.acao == "nome":
+        cfg["nome"] = args.valor
+        config.salvar(cfg)
+        print(f"Nome deste aparelho na rede = {args.valor}")
     elif args.acao == "show":
         mostra = dict(cfg)
         if mostra.get("segredo"):
@@ -115,6 +174,8 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("caminho", help="arquivo OU pasta (da pasta atual, como no git)")
     s.add_argument("--para", required=True, help="nome do destino (ex.: pc, celular)")
     s.add_argument("-m", "--mensagem", default="", help="rótulo do envio (vai pro histórico)")
+    s.add_argument("--descobrir", action="store_true",
+                   help="acha o destino pela rede (ignora o IP da config — útil se mudou)")
     s.set_defaults(func=_cmd_send)
 
     v = sub.add_parser("serve", help="sobe a ponta que escuta e grava o que chega")
@@ -123,13 +184,24 @@ def construir_parser() -> argparse.ArgumentParser:
     v.add_argument("--host", help="0.0.0.0 pra abrir na LAN (padrão: 127.0.0.1)")
     v.set_defaults(func=_cmd_serve)
 
-    c = sub.add_parser("config", help="mexe na config (segredo, destinos)")
+    d = sub.add_parser("devices", help="lista aparelhos Ekodide visíveis na rede (sem digitar IP)")
+    d.add_argument("--tempo", type=float, default=2.5, help="segundos de escuta (padrão: 2.5)")
+    d.set_defaults(func=_cmd_devices)
+
+    pr = sub.add_parser("pair", help="parear: sem frase, gera e mostra; com frase, recebe a do outro")
+    pr.add_argument("frase", nargs="?", help="a frase-código ditada pelo outro aparelho")
+    pr.add_argument("--palavras", type=int, default=6, help="tamanho da frase ao gerar (padrão: 6)")
+    pr.set_defaults(func=_cmd_pair)
+
+    c = sub.add_parser("config", help="mexe na config (segredo, destinos, nome)")
     csub = c.add_subparsers(dest="acao", required=True)
     cseg = csub.add_parser("segredo", help="guarda o segredo (a mesma chave das duas pontas)")
     cseg.add_argument("valor")
     cdes = csub.add_parser("destino", help="cadastra/atualiza um destino")
     cdes.add_argument("nome")
     cdes.add_argument("url")
+    cnom = csub.add_parser("nome", help="como este aparelho aparece na descoberta (padrão: hostname)")
+    cnom.add_argument("valor")
     csub.add_parser("show", help="mostra a config (segredo mascarado)")
     c.set_defaults(func=_cmd_config)
 

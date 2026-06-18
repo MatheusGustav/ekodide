@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 from pathlib import Path
 
 
@@ -61,6 +62,13 @@ def segredo(cfg: dict | None = None) -> str:
         "Sem segredo. Rode:  ekodide config segredo <a-chave>   "
         "(ou defina EKODIDE_SEGREDO no ambiente)."
     )
+
+
+def nome_do_aparelho(cfg: dict | None = None) -> str:
+    """Como este aparelho se apresenta na vizinhança (descoberta). Usa o 'nome' da
+    config; na falta, o hostname da máquina."""
+    cfg = cfg if cfg is not None else carregar()
+    return cfg.get("nome") or socket.gethostname() or "ekodide"
 
 
 def url_do_destino(nome: str, cfg: dict | None = None) -> str:

@@ -14,8 +14,10 @@ Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do
 | `ekodide/carteiro.py` | ENVIA arquivo/pasta; arquivo grande vai **picado**; devolve `EnvioResultado` neutro |
 | `ekodide/caixa_postal.py` | grava cercado (sem travessia/sobrescrita) e remonta pedaços — pura, recebe a pasta `base` |
 | `ekodide/recebedor.py` | servidor HTTP leve que escuta e grava |
-| `ekodide/config.py` | `~/.config/ekodide/config.json` (segredo + destinos, cadeado 600) |
-| `ekodide/cli.py` | comando `ekodide` (`send` / `serve` / `config`) |
+| `ekodide/vizinhanca.py` | descoberta na LAN (UDP broadcast 8779): anuncia presença / acha aparelhos pelo nome — IP vem do remetente, resolve DHCP |
+| `ekodide/frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band; a frase É o segredo) |
+| `ekodide/config.py` | `~/.config/ekodide/config.json` (segredo + destinos + nome, cadeado 600) |
+| `ekodide/cli.py` | comando `ekodide` (`send` / `serve` / `devices` / `pair` / `config`) |
 
 Modelo mental: **2 pontas** — quem RECEBE roda `serve` (caixa aberta), quem ENVIA
 roda `send`. Uso completo no [README](README.md).
@@ -71,14 +73,19 @@ pytest -q                                                       # testes (lacre,
    `ekodide/__init__.py` e subir `0.1.1`. Como o Matheus quer **refinar antes**, o
    próximo release sairá com número novo de qualquer jeito.
 2. **Revisar instalação e conexões — ver se dá pra deixar mais cômodo.**
+   - *Conexão:* ✅ **FEITO (2026-06-18).** Descoberta automática por **UDP broadcast**
+     (`vizinhanca.py`, porta 8779) — não precisa mais digitar IP: `ekodide devices`
+     lista, `send --para <nome>` resolve pelo nome (IP vem do remetente → imune a
+     DHCP). E **pareamento** por frase-código (`frase.py` + `ekodide pair`): o segredo
+     forte é gerado e ditado out-of-band (a frase É o segredo, nunca trafega). O
+     `serve --host 0.0.0.0` já se anuncia sozinho. Escolhi broadcast caseiro em vez de
+     mDNS/zeroconf pra manter o zero-dep. *Falta:* liberar UDP 8779 no firewall ainda
+     é manual; QR de verdade (imagem) ficou de fora (pesado pro zero-dep) — a frase
+     cobre o "PIN".
    - *Instalação:* avaliar um **zipapp single-file** (`ekodide.pyz`, roda só com
      Python, sem pip/pipx — viável porque é zero-dep) pra portabilidade instantânea.
-   - *Conexão (hoje ainda meio manual):* IP fixo (reserva DHCP no roteador) ou
-     **descoberta automática (mDNS/zeroconf)** pra não digitar IP; um **atalho/
-     serviço** pro `ekodide serve` subir sozinho no PC (no celular já sobe via
-     Termux:Boot); rever firewall (a porta de entrada precisa ser liberada à mão).
-   - Objetivo: do "instala pipx, depois ekodide, configura IP na mão" para algo
-     mais plug-and-play.
+   - *Auto-start:* um **atalho/serviço** pro `ekodide serve` subir sozinho no PC (no
+     celular já sobe via Termux:Boot).
 
 ## Notas de campo (provado em 2026-06-18)
 

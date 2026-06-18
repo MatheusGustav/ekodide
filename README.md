@@ -32,16 +32,40 @@ Toda transferência tem **quem recebe** e **quem envia**:
 - **Quem RECEBE** deixa a caixa de correio aberta → `ekodide serve` (fica escutando).
 - **Quem ENVIA** joga a carta → `ekodide send`.
 
-Configure **uma vez** em cada máquina (a mesma chave secreta nas duas pontas):
+### Início rápido (sem digitar IP nem inventar senha) ⭐
+
+Quem recebe abre a caixa **na rede** (já se anuncia sozinho pros outros acharem):
+```bash
+ekodide serve --host 0.0.0.0
+```
+
+Pareie o segredo **uma vez** — num aparelho gere a frase-código, no outro digite a mesma:
+```bash
+# aparelho A:
+ekodide pair                       # mostra algo como: ekodide pair casa-vento-rio-azul-pedra-lobo
+# aparelho B (digite a MESMA frase que apareceu em A):
+ekodide pair casa-vento-rio-azul-pedra-lobo
+```
+A frase **é** o segredo — passe pela tela/voz, ela nunca trafega pela rede.
+
+Veja quem está disponível e envie **pelo nome** (o IP é descoberto sozinho, mesmo
+que mude por DHCP):
+```bash
+ekodide devices                    # lista os aparelhos na rede
+ekodide send foto.jpg --para celular-matheus
+```
+
+### Ou configure na mão (jeito antigo)
 
 ```bash
 ekodide config segredo "uma-chave-bem-secreta"   # IGUAL nos dois aparelhos
 ekodide config destino pc      http://192.168.0.10:8778
 ekodide config destino celular http://192.168.0.9:8778
+ekodide config nome   meu-pc                     # como apareço no 'devices'
 ekodide config show                              # confere (segredo mascarado)
 ```
 
-## As 3 palavras
+## Os comandos
 
 ### `send` — enviar
 ```bash
@@ -49,9 +73,24 @@ ekodide send arquivo.pdf --para celular        # um arquivo
 ekodide send ~/projeto    --para pc            # uma PASTA inteira (com subpastas)
 ekodide send video.mp4    --para celular       # arquivo grande? pica e remonta sozinho
 ekodide send foto.jpg --para pc -m "print do erro"   # -m: etiqueta pro histórico
+ekodide send foto.jpg --para pc --descobrir          # acha o IP na rede (ignora a config)
 ```
-`--para` usa o **apelido** do destino (da config). O caminho é como no git:
-relativo à pasta atual.
+`--para` usa o **apelido** do destino. Se ele estiver na config, usa o IP de lá;
+senão (ou com `--descobrir`), acha o aparelho **pelo nome na rede**. O caminho é
+como no git: relativo à pasta atual.
+
+### `devices` — quem está na rede
+```bash
+ekodide devices              # lista os aparelhos Ekodide que estão com a caixa aberta
+ekodide devices --tempo 4    # escuta por mais tempo (padrão: 2.5s)
+```
+
+### `pair` — combinar o segredo (sem inventar/digitar chave aleatória)
+```bash
+ekodide pair                 # GERA uma frase-código, guarda e mostra pra ditar no outro
+ekodide pair casa-vento-rio-azul-pedra-lobo   # RECEBE a frase ditada pelo outro aparelho
+ekodide pair --palavras 8    # frase mais longa (mais forte) ao gerar
+```
 
 ### `serve` — receber (abrir a caixa)
 ```bash
@@ -90,9 +129,10 @@ ekodide send foto.jpg --para pc
 1. **A caixa precisa estar aberta:** o lado que recebe tem que estar com
    `ekodide serve` no ar.
 2. **Mesmo segredo nos dois lados** — é a chave do cadeado.
-3. **Firewall:** quem recebe precisa liberar a porta de entrada
+3. **Firewall:** quem recebe precisa liberar a porta de transferência
    (ex.: `sudo firewall-cmd --add-port=8778/tcp --permanent && sudo firewall-cmd --reload`).
-   Sintoma de porta fechada: `No route to host` no envio.
+   Sintoma de porta fechada: `No route to host` no envio. Pra **descoberta** (`devices`)
+   funcionar, libere também a UDP do anúncio: `--add-port=8779/udp` no lado que escuta.
 
 ## Usar como biblioteca
 
@@ -120,8 +160,10 @@ Receita pronta em [`contrib/termux/`](contrib/termux/).
 | `carteiro.py` | envia arquivo/pasta; arquivo grande vai **picado** em pedaços |
 | `caixa_postal.py` | grava cercado (sem travessia, sem sobrescrever) e remonta os pedaços |
 | `recebedor.py` | servidor HTTP leve que escuta e grava |
-| `config.py` | lê/grava `~/.config/ekodide/config.json` (segredo + destinos) |
-| `cli.py` | o comando `ekodide` (send/serve/config) |
+| `vizinhanca.py` | descoberta na LAN: anuncia presença e acha aparelhos pelo nome (sem IP) |
+| `frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band) |
+| `config.py` | lê/grava `~/.config/ekodide/config.json` (segredo + destinos + nome) |
+| `cli.py` | o comando `ekodide` (send/serve/devices/pair/config) |
 
 ## Segurança (honesto)
 
