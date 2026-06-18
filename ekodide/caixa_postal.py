@@ -60,6 +60,38 @@ def guardar(nome: str, conteudo: bytes, base: Path) -> Path:
     return alvo
 
 
+def gravar_fluxo(nome: str, leitor, tamanho: int, base: Path, pedaco: int = 1024 * 1024) -> Path:
+    """Grava `tamanho` bytes lidos de `leitor` (um arquivo/stream) dentro de `base`,
+    aos pedaços (sem carregar tudo na memória). Mesma cerca do guardar (sem escapar,
+    sem sobrescrever). Usado pelo portal web, onde o upload vem como corpo cru."""
+    base = base.resolve()
+    alvo_dir, filename = _caminho_seguro(nome, base)
+    alvo = _nome_livre(alvo_dir, filename)
+    alvo_dir.mkdir(parents=True, exist_ok=True)
+    restante = tamanho
+    with alvo.open("wb") as f:
+        while restante > 0:
+            bloco = leitor.read(min(pedaco, restante))
+            if not bloco:
+                break
+            f.write(bloco)
+            restante -= len(bloco)
+    return alvo
+
+
+def caminho_leitura(nome: str, base: Path) -> Path:
+    """Resolve um arquivo pra LER dentro de `base`, sem deixar escapar dela ('../').
+    Levanta ValueError (fora da base) ou FileNotFoundError (não existe). Usado pelos
+    downloads do portal web."""
+    base = base.resolve()
+    alvo = (base / nome).resolve()
+    if base != alvo and base not in alvo.parents:
+        raise ValueError("caminho fora da pasta permitida")
+    if not alvo.is_file():
+        raise FileNotFoundError(nome)
+    return alvo
+
+
 def guardar_pedaco(
     nome: str, conteudo: bytes, parte: int, partes: int, base: Path
 ) -> Path | None:

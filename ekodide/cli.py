@@ -111,7 +111,7 @@ def _cmd_serve(args) -> int:
         if fechadas:
             print(f"  dica: o firewall parece bloquear {', '.join(fechadas)} — "
                   f"libere com:  ekodide firewall --abrir")
-    servir(Path(base).expanduser(), segredo, host=host, porta=int(porta))
+    servir(Path(base).expanduser(), segredo, host=host, porta=int(porta), web=args.web)
     return 0
 
 
@@ -279,6 +279,8 @@ def construir_parser() -> argparse.ArgumentParser:
     v.add_argument("--dir", help="pasta destino (padrão: config ou ~/Downloads)")
     v.add_argument("--porta", type=int, help="porta (padrão: config ou 8778)")
     v.add_argument("--host", help="0.0.0.0 pra abrir na LAN (padrão: 127.0.0.1)")
+    v.add_argument("--web", action="store_true",
+                   help="abre um portal web (navegador) pro aparelho SEM Ekodide; protegido por PIN")
     v.set_defaults(func=_cmd_serve)
 
     d = sub.add_parser("devices", help="lista aparelhos Ekodide visíveis na rede (sem digitar IP)")

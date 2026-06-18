@@ -121,6 +121,7 @@ por porta, precisa de um Prompt de Administrador) e **macOS** (Application Firew
 ekodide serve                      # escuta e grava o que chegar (padrão: ~/Downloads)
 ekodide serve --host 0.0.0.0       # abre na LAN (pra receber de outro aparelho)
 ekodide serve --dir ~/Recebidos    # escolhe a pasta destino
+ekodide serve --host 0.0.0.0 --web # + portal no navegador (aparelho SEM Ekodide)
 ```
 Deixe rodando num terminal; `Ctrl+C` para parar.
 
@@ -159,6 +160,25 @@ ekodide send foto.jpg --para pc
    --add-port=8779/udp --permanent && sudo systemctl restart firewalld`. Sintoma de
    porta fechada: `No route to host` no envio (ou ninguém aparece no `devices`).
 
+## Aparelho SEM Ekodide (só o navegador) 🌐
+
+Pra mandar/receber de um aparelho que **não tem Ekodide instalado** (um celular
+emprestado, um PC de visita), use o **portal web**: ele não instala nada — só abre
+um link no navegador.
+
+```bash
+# no aparelho que TEM Ekodide (o PC):
+ekodide serve --host 0.0.0.0 --web
+#  Portal web (navegador): http://192.168.0.10:8778/?k=RKtzjJAY   — PIN: RKtzjJAY
+```
+No outro aparelho, abra esse link no navegador (ou só `http://192.168.0.10:8778` e
+digite o PIN). Aparece uma página pra **enviar** arquivos pra cá e **baixar** os que
+já chegaram. Zero instalação.
+
+**Aviso honesto:** o navegador não faz o lacre (HMAC), então o portal é protegido
+**só pelo PIN** e **não cifra**. É uma porta mais fraca que a de Ekodide-pra-Ekodide
+— por isso é **opcional** (`--web`) e pra **rede de confiança**.
+
 ## Usar como biblioteca
 
 ```python
@@ -184,7 +204,8 @@ Receita pronta em [`contrib/termux/`](contrib/termux/).
 | `lacre.py` | fechadura HMAC — o segredo nunca trafega |
 | `carteiro.py` | envia arquivo/pasta; arquivo grande vai **picado** em pedaços |
 | `caixa_postal.py` | grava cercado (sem travessia, sem sobrescrever) e remonta os pedaços |
-| `recebedor.py` | servidor HTTP leve que escuta e grava |
+| `recebedor.py` | servidor HTTP leve que escuta e grava (rota lacrada + portal web opcional) |
+| `portal.py` | a paginazinha web pro aparelho sem Ekodide (navegador, protegido por PIN) |
 | `vizinhanca.py` | descoberta na LAN: anuncia presença e acha aparelhos pelo nome (sem IP) |
 | `frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band) |
 | `cortina.py` | detecta o firewall e monta/roda o comando pra liberar as portas |

@@ -13,7 +13,8 @@ Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do
 | `ekodide/lacre.py` | fechadura HMAC — o segredo NUNCA trafega (assina/verifica + janela de tempo) |
 | `ekodide/carteiro.py` | ENVIA arquivo/pasta; arquivo grande vai **picado**; devolve `EnvioResultado` neutro |
 | `ekodide/caixa_postal.py` | grava cercado (sem travessia/sobrescrita) e remonta pedaços — pura, recebe a pasta `base` |
-| `ekodide/recebedor.py` | servidor HTTP leve que escuta e grava |
+| `ekodide/recebedor.py` | servidor HTTP leve que escuta e grava (rota `/receber` lacrada + portal web opcional `--web`) |
+| `ekodide/portal.py` | HTML puro do portal web (navegador) pro aparelho SEM Ekodide; gateado por PIN, sem lacre/TLS |
 | `ekodide/vizinhanca.py` | descoberta na LAN (UDP broadcast 8779): anuncia presença / acha aparelhos pelo nome — IP vem do remetente, resolve DHCP |
 | `ekodide/frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band; a frase É o segredo) |
 | `ekodide/cortina.py` | detecta o firewall (firewalld/ufw) e monta/roda o comando pra liberar as portas (lado que recebe) |
@@ -31,6 +32,13 @@ roda `send`. Uso completo no [README](README.md).
 - **Mesma rede (Wi-Fi)** por enquanto. O lacre garante autenticidade/integridade/
   recência, mas **NÃO cifra** — internet/"rua" pediria somar TLS + nonce (fora de escopo).
 - Segurança é **código determinístico** (lacre), não confiada a modelo.
+- **Aparelho sem Ekodide → portal web (`serve --web`), NÃO auto-instalação.** Pedido
+  recorrente: "o admin conecta e instala sozinho no celular". É IMPOSSÍVEL e proibido
+  pelo SO (Android/iOS não deixam um par da rede instalar app/abrir popup). A resposta
+  viável é o inverso: o celular **não instala nada** e usa o **navegador** (portal web
+  em `portal.py`/`recebedor.py`). Tradeoff travado: o navegador não faz HMAC, então o
+  portal é protegido **só por PIN** e **não cifra** → fica **opcional** e pra rede de
+  confiança. QR pra abrir o portal/PIN no celular é o próximo passo natural.
 
 ## Como rodar / testar
 
