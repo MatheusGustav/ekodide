@@ -17,7 +17,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import config, frase, vizinhanca
+from . import config, cortina, frase, vizinhanca
 from .carteiro import enviar
 
 
@@ -107,7 +107,36 @@ def _cmd_serve(args) -> int:
         nome = config.nome_do_aparelho(cfg)
         vizinhanca.anunciar_em_thread(nome, int(porta))
         print(f"Anunciando como '{nome}' na rede (descoberta automática).")
+        fechadas = [k for k, v in cortina.portas_liberadas(cortina.portas(int(porta))).items() if v is False]
+        if fechadas:
+            print(f"  dica: o firewall parece bloquear {', '.join(fechadas)} — "
+                  f"libere com:  ekodide firewall --abrir")
     servir(Path(base).expanduser(), segredo, host=host, porta=int(porta))
+    return 0
+
+
+def _cmd_firewall(args) -> int:
+    portas = cortina.portas()
+    sistema = cortina.detectar()
+    if sistema is None:
+        print("Não detectei firewalld nem ufw. Se houver firewall, libere no lado que RECEBE:")
+        print("  firewalld: sudo firewall-cmd --add-port=8778/tcp --add-port=8779/udp --permanent")
+        print("             && sudo systemctl restart firewalld")
+        print("  ufw:       sudo ufw allow 8778/tcp && sudo ufw allow 8779/udp")
+        return 0
+    print(f"Firewall detectado: {sistema}")
+    rotulo = {True: "liberada", False: "FECHADA", None: "?"}
+    for chave, ok in cortina.portas_liberadas(portas, sistema).items():
+        print(f"  {chave}: {rotulo[ok]}")
+    if args.abrir:
+        print("Abrindo as portas (vai pedir sudo)…")
+        rc = cortina.liberar(portas, sistema)
+        print("Pronto." if rc == 0 else "Algo falhou ao abrir — rode os comandos à mão.")
+        return rc
+    print("\nPra liberar:")
+    for c in cortina.comandos(portas, sistema):
+        print(f"  {c}")
+    print("\n(ou rode:  ekodide firewall --abrir)")
     return 0
 
 
@@ -192,6 +221,10 @@ def construir_parser() -> argparse.ArgumentParser:
     pr.add_argument("frase", nargs="?", help="a frase-código ditada pelo outro aparelho")
     pr.add_argument("--palavras", type=int, default=6, help="tamanho da frase ao gerar (padrão: 6)")
     pr.set_defaults(func=_cmd_pair)
+
+    fw = sub.add_parser("firewall", help="checa/libera as portas do Ekodide (no lado que recebe)")
+    fw.add_argument("--abrir", action="store_true", help="roda o comando pra liberar (pede sudo)")
+    fw.set_defaults(func=_cmd_firewall)
 
     c = sub.add_parser("config", help="mexe na config (segredo, destinos, nome)")
     csub = c.add_subparsers(dest="acao", required=True)

@@ -92,6 +92,12 @@ ekodide pair casa-vento-rio-azul-pedra-lobo   # RECEBE a frase ditada pelo outro
 ekodide pair --palavras 8    # frase mais longa (mais forte) ao gerar
 ```
 
+### `firewall` — liberar as portas (no lado que recebe)
+```bash
+ekodide firewall             # detecta firewalld/ufw, diz quais portas faltam e o comando
+ekodide firewall --abrir     # roda o comando pra liberar (pede sudo)
+```
+
 ### `serve` — receber (abrir a caixa)
 ```bash
 ekodide serve                      # escuta e grava o que chegar (padrão: ~/Downloads)
@@ -129,10 +135,11 @@ ekodide send foto.jpg --para pc
 1. **A caixa precisa estar aberta:** o lado que recebe tem que estar com
    `ekodide serve` no ar.
 2. **Mesmo segredo nos dois lados** — é a chave do cadeado.
-3. **Firewall:** quem recebe precisa liberar a porta de transferência
-   (ex.: `sudo firewall-cmd --add-port=8778/tcp --permanent && sudo firewall-cmd --reload`).
-   Sintoma de porta fechada: `No route to host` no envio. Pra **descoberta** (`devices`)
-   funcionar, libere também a UDP do anúncio: `--add-port=8779/udp` no lado que escuta.
+3. **Firewall:** quem recebe precisa liberar **TCP 8778** (transferência) e **UDP 8779**
+   (descoberta). O jeito fácil: **`ekodide firewall --abrir`** (detecta firewalld/ufw e
+   roda com sudo). Na mão (Fedora): `sudo firewall-cmd --add-port=8778/tcp
+   --add-port=8779/udp --permanent && sudo systemctl restart firewalld`. Sintoma de
+   porta fechada: `No route to host` no envio (ou ninguém aparece no `devices`).
 
 ## Usar como biblioteca
 
@@ -162,8 +169,9 @@ Receita pronta em [`contrib/termux/`](contrib/termux/).
 | `recebedor.py` | servidor HTTP leve que escuta e grava |
 | `vizinhanca.py` | descoberta na LAN: anuncia presença e acha aparelhos pelo nome (sem IP) |
 | `frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band) |
+| `cortina.py` | detecta o firewall e monta/roda o comando pra liberar as portas |
 | `config.py` | lê/grava `~/.config/ekodide/config.json` (segredo + destinos + nome) |
-| `cli.py` | o comando `ekodide` (send/serve/devices/pair/config) |
+| `cli.py` | o comando `ekodide` (send/serve/devices/pair/firewall/config) |
 
 ## Segurança (honesto)
 

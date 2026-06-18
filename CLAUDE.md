@@ -16,8 +16,9 @@ Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do
 | `ekodide/recebedor.py` | servidor HTTP leve que escuta e grava |
 | `ekodide/vizinhanca.py` | descoberta na LAN (UDP broadcast 8779): anuncia presença / acha aparelhos pelo nome — IP vem do remetente, resolve DHCP |
 | `ekodide/frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band; a frase É o segredo) |
+| `ekodide/cortina.py` | detecta o firewall (firewalld/ufw) e monta/roda o comando pra liberar as portas (lado que recebe) |
 | `ekodide/config.py` | `~/.config/ekodide/config.json` (segredo + destinos + nome, cadeado 600) |
-| `ekodide/cli.py` | comando `ekodide` (`send` / `serve` / `devices` / `pair` / `config`) |
+| `ekodide/cli.py` | comando `ekodide` (`send` / `serve` / `devices` / `pair` / `firewall` / `config`) |
 
 Modelo mental: **2 pontas** — quem RECEBE roda `serve` (caixa aberta), quem ENVIA
 roda `send`. Uso completo no [README](README.md).
@@ -79,9 +80,12 @@ pytest -q                                                       # testes (lacre,
      DHCP). E **pareamento** por frase-código (`frase.py` + `ekodide pair`): o segredo
      forte é gerado e ditado out-of-band (a frase É o segredo, nunca trafega). O
      `serve --host 0.0.0.0` já se anuncia sozinho. Escolhi broadcast caseiro em vez de
-     mDNS/zeroconf pra manter o zero-dep. *Falta:* liberar UDP 8779 no firewall ainda
-     é manual; QR de verdade (imagem) ficou de fora (pesado pro zero-dep) — a frase
-     cobre o "PIN".
+     mDNS/zeroconf pra manter o zero-dep.
+   - *Firewall:* ✅ **FEITO (2026-06-18).** `cortina.py` + `ekodide firewall` detecta
+     firewalld/ufw, diz quais portas (TCP 8778 + UDP 8779) faltam e abre com sudo
+     (`--abrir`); o `serve` avisa na hora se a porta parece fechada. Não abre nada
+     escondido (exige root → você autoriza). QR de verdade (imagem) ficou de fora
+     (pesado pro zero-dep) — a frase-código cobre o "PIN".
    - *Instalação:* avaliar um **zipapp single-file** (`ekodide.pyz`, roda só com
      Python, sem pip/pipx — viável porque é zero-dep) pra portabilidade instantânea.
    - *Auto-start:* um **atalho/serviço** pro `ekodide serve` subir sozinho no PC (no
