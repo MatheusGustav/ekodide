@@ -84,3 +84,44 @@ def test_pair_gera_frase_e_a_outra_ponta_recebe(capsys):
 def test_config_nome_grava(capsys):
     assert cli.main(["config", "nome", "meu-pc"]) == 0
     assert config.carregar()["nome"] == "meu-pc"
+
+
+def test_normalizar_url_aceita_ip_cru_ip_porta_e_url():
+    assert cli._normalizar_url("192.168.0.10") == "http://192.168.0.10:8778"
+    assert cli._normalizar_url("192.168.0.10:9000") == "http://192.168.0.10:9000"
+    assert cli._normalizar_url("http://192.168.0.10:8778") == "http://192.168.0.10:8778"
+    assert cli._normalizar_url("  ") is None
+
+
+def test_config_destino_com_url_explicita_ainda_funciona():
+    assert cli.main(["config", "destino", "pc", "http://10.0.0.5:8778"]) == 0
+    assert config.carregar()["destinos"]["pc"] == "http://10.0.0.5:8778"
+
+
+def test_config_destino_escolhendo_da_rede(monkeypatch, capsys):
+    # finge que a descoberta achou dois aparelhos e que o usuário digitou "2"
+    achados = [
+        {"nome": "galaxy", "ip": "192.168.0.9", "porta": 8778},
+        {"nome": "note", "ip": "192.168.0.20", "porta": 8778},
+    ]
+    monkeypatch.setattr(cli.vizinhanca, "procurar", lambda *a, **k: achados)
+    monkeypatch.setattr(cli, "_perguntar", lambda prompt: "2")
+    assert cli.main(["config", "destino", "celular"]) == 0
+    assert config.carregar()["destinos"]["celular"] == "http://192.168.0.20:8778"
+
+
+def test_config_destino_nada_na_rede_cancela(monkeypatch, capsys):
+    # sem ninguém anunciando, não há o que cadastrar: cancela e ensina a abrir a caixa
+    monkeypatch.setattr(cli.vizinhanca, "procurar", lambda *a, **k: [])
+    assert cli.main(["config", "destino", "tv"]) == 1
+    assert "tv" not in config.carregar().get("destinos", {})
+    assert "caixa aberta" in capsys.readouterr().out
+
+
+def test_config_destino_escolha_invalida_cancela(monkeypatch):
+    monkeypatch.setattr(cli.vizinhanca, "procurar", lambda *a, **k: [
+        {"nome": "x", "ip": "192.168.0.5", "porta": 8778},
+    ])
+    monkeypatch.setattr(cli, "_perguntar", lambda prompt: "9")  # fora da faixa
+    assert cli.main(["config", "destino", "tv"]) == 1
+    assert "tv" not in config.carregar().get("destinos", {})

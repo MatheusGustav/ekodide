@@ -55,12 +55,27 @@ ekodide devices                    # lista os aparelhos na rede
 ekodide send foto.jpg --para celular-matheus
 ```
 
-### Ou configure na mão (jeito antigo)
+### Cadastrar um apelido fixo (escolhendo da rede)
+
+Se preferir um apelido fixo (em vez de resolver pelo nome toda vez), cadastre **sem
+digitar IP** — o Ekodide lista quem está na rede e você só **escolhe qual é**:
+```bash
+ekodide config destino celular
+#  Procurando aparelhos na rede pra cadastrar 'celular'…
+#    1) galaxy-do-mat     http://192.168.0.9:8778
+#    2) notebook-sala     http://192.168.0.20:8778
+#  Qual é o aparelho? [número]: 1
+#  Destino 'celular' = http://192.168.0.9:8778
+ekodide send foto.jpg --para celular             # daí em diante, só o apelido
+```
+Só aparece quem está com a **caixa aberta** (`ekodide serve`) — que é justamente quem
+pode receber. Se a lista vier vazia, é sinal de abrir a caixa no outro aparelho.
+
+### Configurar na mão (avançado / scripts)
 
 ```bash
 ekodide config segredo "uma-chave-bem-secreta"   # IGUAL nos dois aparelhos
-ekodide config destino pc      http://192.168.0.10:8778
-ekodide config destino celular http://192.168.0.9:8778
+ekodide config destino pc 192.168.0.10           # IP cru (completa http+porta) ou URL inteira
 ekodide config nome   meu-pc                     # como apareço no 'devices'
 ekodide config show                              # confere (segredo mascarado)
 ```

@@ -194,6 +194,46 @@ def _cmd_pair(args) -> int:
     return 0
 
 
+def _normalizar_url(texto: str) -> str | None:
+    """Aceita 'http://IP:porta', 'IP:porta' ou só 'IP' e devolve a URL completa.
+    None se vier vazio. Só IP -> completa com a porta padrão de transferência."""
+    texto = (texto or "").strip()
+    if not texto:
+        return None
+    if not texto.startswith(("http://", "https://")):
+        if ":" not in texto:
+            texto = f"{texto}:{cortina.PORTA_TRANSFERENCIA}"  # só IP -> porta padrão
+        texto = "http://" + texto
+    return texto
+
+
+def _perguntar(prompt: str) -> str:
+    """input() que não estoura em terminal sem teclado (pipe/script): devolve ''."""
+    try:
+        return input(prompt).strip()
+    except EOFError:
+        return ""
+
+
+def _cadastrar_destino(apelido: str) -> str | None:
+    """Mostra quem está na rede e deixa ESCOLHER o aparelho; devolve a URL. O IP fica
+    escondido — daí em diante você usa só o apelido. Só aparece quem está com a caixa
+    aberta (serve) — quem não aparece também não receberia nada."""
+    print(f"Procurando aparelhos na rede pra cadastrar '{apelido}'…")
+    achados = vizinhanca.procurar()
+    if not achados:
+        print("  Ninguém apareceu. O outro aparelho precisa estar com a caixa aberta")
+        print("  (ekodide serve --host 0.0.0.0). Abra lá e tente de novo.")
+        return None
+    for i, ap in enumerate(achados, 1):
+        print(f"  {i}) {ap['nome']:<16} {vizinhanca.url_de(ap)}")
+    escolha = _perguntar("Qual é o aparelho? [número]: ")
+    if escolha.isdigit() and 1 <= int(escolha) <= len(achados):
+        return vizinhanca.url_de(achados[int(escolha) - 1])
+    print("  Escolha inválida.")
+    return None
+
+
 def _cmd_config(args) -> int:
     cfg = config.carregar()
     if args.acao == "segredo":
@@ -201,9 +241,14 @@ def _cmd_config(args) -> int:
         config.salvar(cfg)
         print(f"Segredo guardado em {config.caminho()} (cadeado 600).")
     elif args.acao == "destino":
-        cfg.setdefault("destinos", {})[args.nome] = args.url
+        # sem url -> escolhe da rede; com url (avançado/scripts) aceita IP cru ou completo
+        url = _normalizar_url(args.url) if args.url else _cadastrar_destino(args.nome)
+        if not url:
+            print("Cadastro cancelado (sem endereço).", file=sys.stderr)
+            return 1
+        cfg.setdefault("destinos", {})[args.nome] = url
         config.salvar(cfg)
-        print(f"Destino '{args.nome}' = {args.url}")
+        print(f"Destino '{args.nome}' = {url}")
     elif args.acao == "nome":
         cfg["nome"] = args.valor
         config.salvar(cfg)
@@ -253,9 +298,9 @@ def construir_parser() -> argparse.ArgumentParser:
     csub = c.add_subparsers(dest="acao", required=True)
     cseg = csub.add_parser("segredo", help="guarda o segredo (a mesma chave das duas pontas)")
     cseg.add_argument("valor")
-    cdes = csub.add_parser("destino", help="cadastra/atualiza um destino")
+    cdes = csub.add_parser("destino", help="cadastra um destino: sem url, escolhe da rede")
     cdes.add_argument("nome")
-    cdes.add_argument("url")
+    cdes.add_argument("url", nargs="?", help="http://IP:porta (omita pra escolher da rede)")
     cnom = csub.add_parser("nome", help="como este aparelho aparece na descoberta (padrão: hostname)")
     cnom.add_argument("valor")
     csub.add_parser("show", help="mostra a config (segredo mascarado)")
