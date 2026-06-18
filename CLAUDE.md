@@ -40,9 +40,36 @@ pytest -q                                                       # testes (lacre,
 
 1. **Publicar no PyPI.** Hoje instala via GitHub (`pipx install git+https://...`).
    Publicar no PyPI deixa virar `pipx install ekodide` / `pip install ekodide` em
-   qualquer lugar, sem URL, e discoverable. Precisa: conta PyPI + token; conferir
-   se o nome **"ekodide"** está livre; `python -m build` + `twine upload`. É publish
-   pra fora → confirmar com o Matheus antes.
+   qualquer lugar, sem URL, e discoverable. É publish pra fora → **confirmar com o
+   Matheus antes** de dar o `twine upload`.
+
+   **Empacotamento PRONTO (deixado pronto em 2026-06-18, falta só o upload).** O que
+   já foi conferido/feito:
+   - Nome **"ekodide" livre** no PyPI (checado, deu 404 → ninguém pegou).
+   - `pyproject.toml` turbinado: `classifiers`, `keywords` e `[project.urls]`
+     (Homepage/Repository/Issues apontando pro GitHub) — pra ficar discoverable e
+     com página decente.
+   - `python -m build` gera `dist/ekodide-0.1.0.tar.gz` + `.whl` sem erro.
+   - `twine check dist/*` → PASSED nos dois. Smoke test: wheel instala em venv limpo
+     e o comando `ekodide` roda.
+   - `pytest -q` → 27 passam.
+
+   **Para publicar quando decidir** (build/twine NÃO estão no sistema; use venv
+   descartável — `pipx` não existe nesta máquina):
+   ```bash
+   python3 -m venv .venv-build && .venv-build/bin/pip install -U build twine
+   rm -rf build dist ekodide.egg-info
+   .venv-build/bin/python -m build
+   .venv-build/bin/twine check dist/*
+   # ENSAIO opcional (conta/token SEPARADOS do PyPI real):
+   .venv-build/bin/twine upload --repository testpypi dist/*
+   # REAL (confirmar com o Matheus; pede o token pypi-... na hora):
+   .venv-build/bin/twine upload dist/*
+   ```
+   PEGADINHA: cada versão é **imutável** — não dá pra reupar/editar a `0.1.0` depois
+   (nem após deletar). Correção = bumpar `version` no `pyproject.toml` **e** no
+   `ekodide/__init__.py` e subir `0.1.1`. Como o Matheus quer **refinar antes**, o
+   próximo release sairá com número novo de qualquer jeito.
 2. **Revisar instalação e conexões — ver se dá pra deixar mais cômodo.**
    - *Instalação:* avaliar um **zipapp single-file** (`ekodide.pyz`, roda só com
      Python, sem pip/pipx — viável porque é zero-dep) pra portabilidade instantânea.

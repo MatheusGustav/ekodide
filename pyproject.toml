@@ -10,8 +10,31 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Matheus Gustav" }]
 license = { text = "MIT" }
+keywords = ["file-transfer", "hmac", "lan", "wifi", "stdlib", "zero-dependencies", "termux"]
 # Zero dependências de propósito: só a stdlib (urllib, http.server, hmac).
 dependencies = []
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: File Sharing",
+    "Topic :: System :: Networking",
+    "Topic :: Security :: Cryptography",
+    "Natural Language :: Portuguese (Brazilian)",
+]
+
+[project.urls]
+Homepage = "https://github.com/MatheusGustav/ekodide"
+Repository = "https://github.com/MatheusGustav/ekodide"
+Issues = "https://github.com/MatheusGustav/ekodide/issues"
 
 [project.scripts]
 # Isto é o que põe o comando 'ekodide' no PATH ao instalar (pipx/pip).
