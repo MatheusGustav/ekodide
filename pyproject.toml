@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ekodide"
+version = "0.1.0"
+description = "Enviar e receber arquivos pela rede, lacrados (HMAC) e idênticos. Sem dependências."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Matheus Gustav" }]
+license = { text = "MIT" }
+# Zero dependências de propósito: só a stdlib (urllib, http.server, hmac).
+dependencies = []
+
+[project.scripts]
+# Isto é o que põe o comando 'ekodide' no PATH ao instalar (pipx/pip).
+ekodide = "ekodide.cli:main"
+
+[tool.setuptools]
+packages = ["ekodide"]
