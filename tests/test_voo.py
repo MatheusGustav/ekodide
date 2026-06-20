@@ -74,6 +74,47 @@ def test_midia_mp4_mp3_chega_identica(servidor, tmp_path, monkeypatch):
         assert r.ok and _sha(base / origem.name) == _sha(origem)
 
 
+def test_retoma_de_onde_parou(servidor, tmp_path, monkeypatch):
+    """Simula a rede caindo no meio: só os 2 primeiros pedaços chegaram. Um novo
+    envio tem que RETOMAR (pular o que já chegou) e terminar byte-idêntico."""
+    url, base = servidor
+    monkeypatch.setattr(carteiro, "PEDACO", 4)  # 10 bytes -> 3 pedaços
+    origem = tmp_path / "grande.bin"
+    origem.write_bytes(bytes(range(10)))
+    tamanho = origem.stat().st_size
+    # "metade chegou": manda os pedaços 0 e 1 na mão; a rede 'cai' antes do 2
+    with origem.open("rb") as f:
+        for i in range(2):
+            ok, _ = carteiro._postar("grande.bin", f.read(4), url, SEGREDO, i, 3, tamanho)
+            assert ok
+    assert not (base / "grande.bin").exists()  # ainda incompleto
+    # o destino já confirma ter 2 pedaços
+    assert carteiro._ja_recebidos("grande.bin", url, SEGREDO, 3, tamanho) == 2
+    # novo envio: retoma e fecha idêntico
+    r = enviar(origem, url, SEGREDO)
+    assert r.ok and _sha(base / "grande.bin") == _sha(origem)
+
+
+def test_pedaco_repetido_nao_corrompe(tmp_path):
+    """Reenvio de um pedaço já gravado (queda da rede com ACK perdido) é ignorado,
+    sem duplicar bytes — e o arquivo final sai certinho."""
+    from ekodide.caixa_postal import guardar_pedaco, progresso_de
+    guardar_pedaco("g.bin", b"AAAA", 0, 3, tmp_path, 12)
+    guardar_pedaco("g.bin", b"BBBB", 1, 3, tmp_path, 12)
+    assert guardar_pedaco("g.bin", b"BBBB", 1, 3, tmp_path, 12) is None  # repetido
+    assert progresso_de("g.bin", 3, tmp_path, 12) == 2
+    final = guardar_pedaco("g.bin", b"CCCC", 2, 3, tmp_path, 12)
+    assert final.read_bytes() == b"AAAABBBBCCCC"
+
+
+def test_pedaco_fora_de_ordem_recusado(tmp_path):
+    """Pular um pedaço deixaria um buraco no arquivo — tem que ser recusado."""
+    from ekodide.caixa_postal import guardar_pedaco
+    guardar_pedaco("g.bin", b"AAAA", 0, 3, tmp_path, 12)
+    with pytest.raises(ValueError):
+        guardar_pedaco("g.bin", b"CCCC", 2, 3, tmp_path, 12)  # pulou o pedaço 1
+
+
 def test_segredo_errado_nao_grava(servidor, tmp_path):
     url, base = servidor
     origem = tmp_path / "x.txt"

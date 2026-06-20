@@ -60,23 +60,63 @@ def guardar(nome: str, conteudo: bytes, base: Path) -> Path:
     return alvo
 
 
+def _ler_progresso(alvo_dir: Path, filename: str, partes: int, tamanho: int) -> int:
+    """Quantos pedaços contíguos já temos no '.parcial' — lido do anotador
+    '.parcial.meta'. Só vale se o meta casar com ESTE arquivo (mesmo nº de partes e
+    mesmo tamanho total); senão devolve 0 (é outro arquivo de mesmo nome → recomeça)."""
+    parcial = alvo_dir / (filename + ".parcial")
+    meta = alvo_dir / (filename + ".parcial.meta")
+    if not (parcial.exists() and meta.exists()):
+        return 0
+    try:
+        mp, mr, mt = meta.read_text().split()
+        if int(mp) == partes and int(mt) == tamanho:
+            return max(0, min(int(mr), partes))
+    except (ValueError, OSError):
+        pass
+    return 0
+
+
+def progresso_de(nome: str, partes: int, base: Path, tamanho: int = -1) -> int:
+    """Quantos pedaços deste arquivo o destino já tem (pro carteiro RETOMAR de onde
+    parou). 0 = nada ainda / arquivo diferente. Mesma cerca de segurança do guardar."""
+    base = base.resolve()
+    alvo_dir, filename = _caminho_seguro(nome, base)
+    return _ler_progresso(alvo_dir, filename, partes, tamanho)
+
+
 def guardar_pedaco(
-    nome: str, conteudo: bytes, parte: int, partes: int, base: Path
+    nome: str, conteudo: bytes, parte: int, partes: int, base: Path, tamanho: int = -1
 ) -> Path | None:
     """Recebe UM pedaço de um arquivo grande e vai montando num arquivo temporário
-    '.parcial' (parte 0 cria/zera, as seguintes anexam, na ordem). No ÚLTIMO pedaço
-    fecha e renomeia pro nome final (sem sobrescrever) — e devolve esse caminho.
-    Enquanto monta, devolve None. Mesma cerca de segurança do guardar."""
+    '.parcial', anotando o progresso no '.parcial.meta' (pra dar pra RETOMAR depois).
+    No ÚLTIMO pedaço fecha, renomeia pro nome final (sem sobrescrever), apaga o meta e
+    devolve o caminho. Enquanto monta, devolve None.
+
+    Retomada/idempotência: o pedaço já recebido é ignorado (reenvio após queda da rede
+    não corrompe); pedaço fora de ordem (pulou um) é recusado. Mesma cerca do guardar."""
     base = base.resolve()
     alvo_dir, filename = _caminho_seguro(nome, base)
     alvo_dir.mkdir(parents=True, exist_ok=True)
     parcial = alvo_dir / (filename + ".parcial")
+    meta = alvo_dir / (filename + ".parcial.meta")
+
+    recebidos = _ler_progresso(alvo_dir, filename, partes, tamanho)
+    if parte < recebidos:        # já temos esse pedaço — reenvio repetido, ignora
+        return None
+    if parte > recebidos:        # pulou um pedaço: não dá pra anexar com buraco
+        raise ValueError(f"pedaço fora de ordem (esperava {recebidos}, veio {parte})")
+
     with parcial.open("wb" if parte == 0 else "ab") as f:
         f.write(conteudo)
-    if parte >= partes - 1:  # último pedaço: vira o arquivo final
+    recebidos = parte + 1
+
+    if recebidos >= partes:  # último pedaço: vira o arquivo final
         final = _nome_livre(alvo_dir, filename)
         parcial.replace(final)
+        meta.unlink(missing_ok=True)
         return final
+    meta.write_text(f"{partes} {recebidos} {tamanho}")
     return None
 
 
@@ -89,7 +129,8 @@ def gravar_recebido(carga: dict, base: Path) -> Path | None:
     conteudo = base64.b64decode(carga["conteudo"], validate=True)
     if "partes" in carga:
         parte, partes = int(carga["parte"]), int(carga["partes"])
+        tamanho = int(carga.get("tamanho", -1))  # total do arquivo (pra travar a retomada)
         if partes < 1 or parte < 0 or parte >= partes:
             raise ValueError("índice de pedaço inválido")
-        return guardar_pedaco(nome, conteudo, parte, partes, base)
+        return guardar_pedaco(nome, conteudo, parte, partes, base, tamanho)
     return guardar(nome, conteudo, base)

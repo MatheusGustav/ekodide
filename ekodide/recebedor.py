@@ -14,7 +14,7 @@ import binascii
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from .caixa_postal import gravar_recebido
+from .caixa_postal import gravar_recebido, progresso_de
 from .lacre import TrancaInvalida, desempacotar, empacotar
 
 # Teto do corpo: base64 incha ~33%, então ~32 MB aqui ≈ ~24 MB de arquivo real.
@@ -27,32 +27,60 @@ def criar_handler(base: Path, segredo: str) -> type[BaseHTTPRequestHandler]:
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:
-            if self.path != "/receber":
+            if self.path == "/receber":
+                self._receber()
+            elif self.path == "/progresso":
+                self._progresso()
+            else:
                 self._texto(404, "rota desconhecida")
-                return
+
+        def _ler_carga(self) -> dict | None:
+            """Lê o corpo e abre o lacre. Devolve a carga, ou None (já respondeu o
+            erro). Nada acontece sem a assinatura bater."""
             tamanho = int(self.headers.get("Content-Length") or 0)
             if tamanho <= 0 or tamanho > LIMITE_CORPO:
                 self._texto(400, "corpo ausente ou grande demais")
-                return
+                return None
             corpo = self.rfile.read(tamanho)
-
-            # 1) LACRE: nada é gravado sem a assinatura bater.
             try:
-                carga = desempacotar(corpo, segredo)
+                return desempacotar(corpo, segredo)
             except TrancaInvalida as erro:
                 self._texto(401, f"recusado pela tranca: {erro}")
-                return
+                return None
 
-            # 2) GRAVA, com o nome cercado na pasta permitida.
+        def _receber(self) -> None:
+            carga = self._ler_carga()
+            if carga is None:
+                return
+            # GRAVA, com o nome cercado na pasta permitida.
             try:
                 alvo = gravar_recebido(carga, base)
             except (KeyError, ValueError, binascii.Error, OSError) as erro:
                 self._texto(400, f"envio inválido: {erro}")
                 return
+            # Confirma assinado: o destino (último pedaço / arquivo inteiro), ou vazio
+            # enquanto um grande ainda está sendo montado.
+            self._selar({"ok": True, "destino": str(alvo) if alvo else ""})
 
-            # 3) Confirma assinado: o destino (último pedaço / arquivo inteiro), ou
-            #    vazio enquanto um grande ainda está sendo montado.
-            selada = empacotar({"ok": True, "destino": str(alvo) if alvo else ""}, segredo)
+        def _progresso(self) -> None:
+            """Diz quantos pedaços contíguos já tem deste arquivo — pro carteiro
+            RETOMAR de onde parou em vez de recomeçar do zero."""
+            carga = self._ler_carga()
+            if carga is None:
+                return
+            try:
+                nome = carga["nome"]
+                partes = int(carga["partes"])
+                tamanho = int(carga.get("tamanho", -1))
+                recebidos = progresso_de(nome, partes, base, tamanho)
+            except (KeyError, ValueError) as erro:
+                self._texto(400, f"consulta inválida: {erro}")
+                return
+            self._selar({"recebidos": recebidos})
+
+        def _selar(self, dados: dict) -> None:
+            """Responde 200 com o corpo lacrado (assinado com o segredo)."""
+            selada = empacotar(dados, segredo)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(selada)))
