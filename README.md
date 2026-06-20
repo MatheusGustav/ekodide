@@ -172,10 +172,10 @@ print(r.ok, r.destino)
 servir(Path("~/Downloads").expanduser(), segredo="...", host="0.0.0.0")
 ```
 
-## Android (Termux)
+## Android
 
-Dá pra rodar o recebedor no celular via Termux, subindo sozinho no boot.
-Receita pronta em [`contrib/termux/`](contrib/termux/).
+Em breve via **app nativo** (o celular como ponta passiva que o PC comanda).
+Em desenvolvimento.
 
 ## Como é por dentro
 

@@ -1,8 +1,9 @@
 # Ekodide — guia do projeto 🦜
 
-Peça **solta** que envia e recebe arquivos pela rede, lacrados (HMAC) e idênticos.
-Só biblioteca padrão do Python (**zero dependências**). Determinística — sem IA
-dentro; algo *aciona* (humano, script, agente), o trabalho é do maquinário fixo.
+Peça **solta** que envia e recebe arquivos pela rede, **lacrados** (HMAC) e **cifrados**
+(AES-256-GCM), chegando **byte-idênticos**. Quase tudo é biblioteca padrão do Python —
+a única dependência é a `cryptography` (a cifra). Determinística — sem IA dentro; algo
+*aciona* (humano, script, agente), o trabalho é do maquinário fixo.
 
 Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do projeto Orogbô)
 
@@ -12,9 +13,9 @@ Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do
 |---|---|
 | `ekodide/lacre.py` | fechadura HMAC — o segredo NUNCA trafega (assina/verifica + janela de tempo) |
 | `ekodide/cofre.py` | cifra o CONTEÚDO (AES-256-GCM, chave via HKDF do segredo) — embaralha na rede, entrega byte-idêntico; depende de `cryptography` |
-| `ekodide/carteiro.py` | ENVIA arquivo/pasta; arquivo grande vai **picado**; devolve `EnvioResultado` neutro |
-| `ekodide/caixa_postal.py` | grava cercado (sem travessia/sobrescrita) e remonta pedaços — pura, recebe a pasta `base` |
-| `ekodide/recebedor.py` | servidor HTTP leve que escuta e grava |
+| `ekodide/carteiro.py` | ENVIA arquivo/pasta; grande vai **picado**; **retoma** de onde parou + **keep-alive** (conexão reusada); devolve `EnvioResultado` neutro |
+| `ekodide/caixa_postal.py` | grava cercado (sem travessia/sobrescrita) e remonta pedaços (anota progresso no `.parcial.meta`) — pura, recebe a pasta `base` |
+| `ekodide/recebedor.py` | servidor HTTP leve (HTTP/1.1) que escuta, decifra e grava; rota `/progresso` pra retomada |
 | `ekodide/vizinhanca.py` | descoberta na LAN (UDP broadcast 8779): anuncia presença / acha aparelhos pelo nome — IP vem do remetente, resolve DHCP |
 | `ekodide/frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band; a frase É o segredo) |
 | `ekodide/cortina.py` | detecta o firewall (firewalld/ufw) e monta/roda o comando pra liberar as portas (lado que recebe) |
@@ -27,118 +28,106 @@ roda `send`. Uso completo no [README](README.md).
 ## Decisões travadas (não reabrir sem motivo)
 
 - **Zero dependências é PREFERÊNCIA, não regra** (corrigido 2026-06-20 pelo Matheus
-  Gustav — o "decisão travada" foi o Claude que endureceu). Prefere-se só stdlib (leve,
-  instala em qualquer lugar, roda no Termux sem dor, dá pra empacotar como arquivo
-  único), MAS dá pra somar dependência se houver motivo real — desde que seja a
-  **melhor possível, gratuita e sem API paga**. Não adicionar lib à toa.
-- **Mesma rede (Wi-Fi)** por enquanto. O lacre garante autenticidade/integridade/
-  recência. Cifrar o conteúdo (esconder de todos menos remetente/destinatário) deixou
-  de ser "fora de escopo" — o Matheus pediu (2026-06-20). Caminho recomendado:
-  `cryptography` (AES-GCM) chaveada pelo segredo que as pontas já compartilham (a
-  frase-código), mantendo o arquivo entregue byte-idêntico (decifra = inverso exato).
-- Segurança é **código determinístico** (lacre), não confiada a modelo.
+  Gustav — o "decisão travada" foi o Claude que endureceu). Prefere-se stdlib (leve,
+  instala fácil), MAS dá pra somar dependência se houver motivo real — desde que seja a
+  **melhor possível, gratuita e sem API paga**. Hoje a única é a `cryptography` (cifra).
+  Não adicionar lib à toa.
+- **Conteúdo CIFRADO** (decidido 2026-06-20). O lacre prova autenticidade/integridade/
+  recência; o **cofre** (AES-256-GCM, chave HKDF do segredo das pontas) esconde o
+  conteúdo — na rede passa só embaralhado, o arquivo gravado fica byte-idêntico
+  (decifrar = inverso exato). A cifra é só no **seam da rede** (carteiro cifra /
+  recebedor decifra); a caixa postal continua pura (texto-claro).
+- **Mesma rede (Wi-Fi)** por foco, não por limite de cifra. O que falta pra "rua"
+  (internet) é endereçamento/NAT, não proteção do conteúdo.
+- Segurança é **código determinístico** (lacre + cofre), não confiada a modelo.
+- **Byte-idêntico é sagrado.** Nada no caminho padrão do `send` pode mudar os bytes
+  entregues (é por isso que "preparar vídeo" fica fora — ver TODO #4).
 
 ## Como rodar / testar
 
 ```bash
 pipx install git+https://github.com/MatheusGustav/ekodide.git   # ou pip install --user ...
-pytest -q                                                       # testes (lacre, caixa, voo, config, cli)
+pytest -q   # 60 testes: lacre, cofre, caixa, voo (envio+cifra+retomada), config, cli, etc.
 ```
 
-## TODO / próximos passos (anotado 2026-06-18)
+## TODO / próximos passos (atualizado 2026-06-20)
 
 1. **Publicar no PyPI.** Hoje instala via GitHub (`pipx install git+https://...`).
-   Publicar no PyPI deixa virar `pipx install ekodide` / `pip install ekodide` em
-   qualquer lugar, sem URL, e discoverable. É publish pra fora → **confirmar com o
-   Matheus antes** de dar o `twine upload`.
+   Publicar deixa virar `pipx install ekodide` / `pip install ekodide`, sem URL, e
+   discoverable. É publish pra fora → **confirmar com o Matheus antes** do `twine upload`.
+   - **Versão:** a `0.1.0` atual é a **primeira versão usável** e **nunca foi publicada**
+     — então sai como `0.1.0` mesmo (não precisa bumpar; só se bate no PyPI já existindo).
+   - **ATENÇÃO — o empacotamento de 2026-06-18 ficou DEFASADO.** De lá pra cá o código
+     mudou muito (cifra, retomada, keep-alive) e ganhou **dependência** (`cryptography`).
+     O `dist/` antigo foi apagado. **Tem que rebuildar do zero** antes de subir.
+   - Nome **"ekodide"** estava livre no PyPI em 2026-06-18 (404). **Reconferir** antes.
+   - `pyproject.toml` já tem `classifiers`, `keywords`, `[project.urls]` e a
+     `dependencies = ["cryptography>=42"]`.
+   - **Rebuildar e publicar** (build/twine NÃO estão no sistema; venv descartável):
+     ```bash
+     python3 -m venv .venv-build && .venv-build/bin/pip install -U build twine
+     rm -rf build dist ekodide.egg-info
+     .venv-build/bin/python -m build
+     .venv-build/bin/twine check dist/*
+     # ENSAIO opcional (conta/token SEPARADOS): twine upload --repository testpypi dist/*
+     # REAL (confirmar com o Matheus; pede o token pypi-... na hora):
+     .venv-build/bin/twine upload dist/*
+     ```
+   - PEGADINHA: depois de publicada, **cada versão é imutável** — correção = bumpar
+     `version` no `pyproject.toml` **e** no `ekodide/__init__.py` e subir nova.
 
-   **Empacotamento PRONTO (deixado pronto em 2026-06-18, falta só o upload).** O que
-   já foi conferido/feito:
-   - Nome **"ekodide" livre** no PyPI (checado, deu 404 → ninguém pegou).
-   - `pyproject.toml` turbinado: `classifiers`, `keywords` e `[project.urls]`
-     (Homepage/Repository/Issues apontando pro GitHub) — pra ficar discoverable e
-     com página decente.
-   - `python -m build` gera `dist/ekodide-0.1.0.tar.gz` + `.whl` sem erro.
-   - `twine check dist/*` → PASSED nos dois. Smoke test: wheel instala em venv limpo
-     e o comando `ekodide` roda.
-   - `pytest -q` → 27 passam.
+2. **Instalação/conexão mais cômoda.**
+   - *Conexão:* ✅ **FEITO (2026-06-18).** Descoberta por **UDP broadcast**
+     (`vizinhanca.py`, porta 8779): `ekodide devices` lista, `send --para <nome>` resolve
+     pelo nome (IP vem do remetente → imune a DHCP). **Pareamento** por frase-código
+     (`frase.py` + `ekodide pair`): o segredo é gerado e ditado out-of-band. Broadcast
+     caseiro em vez de mDNS/zeroconf.
+   - *Firewall:* ✅ **FEITO (2026-06-18).** `cortina.py` + `ekodide firewall` detecta e
+     abre as portas (TCP 8778 + UDP 8779) com `--abrir`. Cobre Linux (firewalld/ufw),
+     Windows (netsh) e macOS (App Firewall, por app). Conferido contra docs oficiais.
+   - *Velocidade/robustez:* ✅ **FEITO (2026-06-20).** Envio reusa UMA conexão
+     (keep-alive, HTTP/1.1), pedaço de 16 MB, e **retoma de onde parou** se a rede cair
+     (rota `/progresso` + `.parcial.meta`, recebimento idempotente).
+   - *Instalação:* o **zipapp single-file** (`ekodide.pyz`) ficou mais difícil agora que
+     há a dep nativa `cryptography` (não embute fácil num .pyz). Reavaliar.
+   - *Auto-start:* um **atalho/serviço** pro `ekodide serve` subir sozinho no PC.
 
-   **Para publicar quando decidir** (build/twine NÃO estão no sistema; use venv
-   descartável — `pipx` não existe nesta máquina):
-   ```bash
-   python3 -m venv .venv-build && .venv-build/bin/pip install -U build twine
-   rm -rf build dist ekodide.egg-info
-   .venv-build/bin/python -m build
-   .venv-build/bin/twine check dist/*
-   # ENSAIO opcional (conta/token SEPARADOS do PyPI real):
-   .venv-build/bin/twine upload --repository testpypi dist/*
-   # REAL (confirmar com o Matheus; pede o token pypi-... na hora):
-   .venv-build/bin/twine upload dist/*
-   ```
-   PEGADINHA: cada versão é **imutável** — não dá pra reupar/editar a `0.1.0` depois
-   (nem após deletar). Correção = bumpar `version` no `pyproject.toml` **e** no
-   `ekodide/__init__.py` e subir `0.1.1`. Como o Matheus quer **refinar antes**, o
-   próximo release sairá com número novo de qualquer jeito.
-2. **Revisar instalação e conexões — ver se dá pra deixar mais cômodo.**
-   - *Conexão:* ✅ **FEITO (2026-06-18).** Descoberta automática por **UDP broadcast**
-     (`vizinhanca.py`, porta 8779) — não precisa mais digitar IP: `ekodide devices`
-     lista, `send --para <nome>` resolve pelo nome (IP vem do remetente → imune a
-     DHCP). E **pareamento** por frase-código (`frase.py` + `ekodide pair`): o segredo
-     forte é gerado e ditado out-of-band (a frase É o segredo, nunca trafega). O
-     `serve --host 0.0.0.0` já se anuncia sozinho. Escolhi broadcast caseiro em vez de
-     mDNS/zeroconf pra manter o zero-dep.
-   - *Firewall:* ✅ **FEITO (2026-06-18).** `cortina.py` + `ekodide firewall` detecta o
-     firewall e abre as portas (TCP 8778 + UDP 8779) com `--abrir`; o `serve` avisa na
-     hora se parece fechado. Não abre nada escondido (exige privilégio → você autoriza).
-     Cobre **Linux** (firewalld/ufw, por porta, sudo), **Windows** (netsh advfirewall,
-     por porta, precisa de Administrador) e **macOS** (Application Firewall: é por APP,
-     libera o `sys.executable`; vem desligado de fábrica → detecta o estado e só age se
-     ligado). Comandos conferidos contra docs oficiais (Microsoft/Apple). QR de verdade
-     (imagem) ficou de fora (pesado pro zero-dep) — a frase-código cobre o "PIN".
-   - *Instalação:* avaliar um **zipapp single-file** (`ekodide.pyz`, roda só com
-     Python, sem pip/pipx — viável porque é zero-dep) pra portabilidade instantânea.
-   - *Auto-start:* um **atalho/serviço** pro `ekodide serve` subir sozinho no PC (no
-     celular já sobe via Termux:Boot).
+3. **App nativo no celular (PENDENTE).** Objetivo: o **admin (PC) dirige tudo** — puxa
+   e injeta arquivo no celular — com o **celular PASSIVO**.
+   - **Por que app:** pro PC "entrar" no celular, o celular tem que ser **servidor**
+     (escutar/expor). Navegador é cliente, não vira servidor → portal web NÃO atende.
+     Auto-instalar de fora é proibido pelo SO. Só **app instalado** resolve.
+   - **Tentativa revertida:** portal web (`serve --web`) implementado e **revertido**
+     (commit `482ddc9` desfez `9f4cd2f`) — deixava o celular ativo, o oposto do desejo.
+   - **Termux:** o caminho via Termux foi **removido (2026-06-20)** — vai dar lugar ao
+     app nativo. (Os scripts em `contrib/termux/` saíram do repo.)
+   - **Quando for fazer:** app Android (e talvez iOS) no papel de recebedor/servidor;
+     outra stack (não é Python puro).
 
-3. **App nativo no celular (PENDENTE — decidido 2026-06-18).** Objetivo do Matheus: o
-   **admin (PC) dirige tudo** — puxa arquivo do celular e injeta no celular — com o
-   **celular PASSIVO**, sem a manha de instalar Termux/Python/ekodide.
-   - **Por que precisa de app (não dá pra fugir):** pro PC "entrar" no celular, o
-     celular tem que ser um **servidor** (escutar e expor arquivos). Navegador é
-     **cliente/visitante**, não vira servidor — então a ideia de portal web NÃO atende
-     esse desejo (o celular é que teria de tocar os botões). E auto-instalar de fora é
-     proibido pelo SO. Logo, **só um app instalado** transforma o celular num par
-     passivo que o admin comanda.
-   - **Tentativa revertida:** o portal web (`serve --web`) foi implementado e depois
-     **revertido** (commit `482ddc9` desfez o `9f4cd2f`) — resolvia "sem instalar", mas
-     deixava o celular ativo (cliente), o oposto do que o Matheus quer.
-   - **Quando for fazer:** app Android (e talvez iOS) que roda o papel de recebedor/
-     servidor; provavelmente fora do escopo "stdlib Python puro" — é outra stack.
+4. **Preparar vídeo MP4 — CONTINUA FORA DE ESCOPO (reconfirmado 2026-06-20).**
+   - **Caso real:** um `.mp4` de gravador (fragmentado) chega cópia perfeita, mas a
+     Galeria mostra 00:00 e o WhatsApp recusa. **Cópia perfeita de vídeo torto continua
+     torto** — o conserto é remux `+faststart` / reencode, na origem.
+   - **Por que fica fora:** "tratar" o vídeo **muda os bytes** (quebra o "byte-idêntico",
+     pilar sagrado) e precisa de **ffmpeg**. NÃO entra no caminho padrão do `send`.
+   - **Se um dia:** ferramenta **opt-in e separada** (`ekodide video --faststart <arq>`),
+     que avisa que gera arquivo novo (sha diferente, de propósito) e só roda com ffmpeg
+     no PATH. Núcleo intocado.
 
-4. **Funcionalidade: preparar vídeo MP4 na transferência (anotado 2026-06-19).**
-   Ideia do Matheus: ao mandar um `.mp4`, ter um passo que deixa o vídeo **pronto pra
-   tocar/postar** no destino — não só copiar os bytes.
-   - **Por que surgiu (caso real):** um `.mp4` de gravador (fragmentado — `moov`
-     minúsculo + vários `mdat`, frame rate variável) chega cópia perfeita, mas a Galeria
-     mostra **00:00** e o WhatsApp recusa. O Ekodide cumpriu a promessa (sha256 idêntico),
-     só que **cópia perfeita de um vídeo torto continua torto**. Conserto que funcionou:
-     remux pra MP4 padrão (`moov` no início + `+faststart`) e, pra garantir, reencode
-     H.264 High / yuv420p / 30fps CFR.
-   - **TENSÃO DE DESIGN (decidir antes de codar):** preparar vídeo **quebra dois pilares**
-     do projeto — (a) muda os bytes, então **sha256 deixa de bater** (a ponta "repete com
-     perfeição" some); (b) precisa de **ffmpeg**, furando o **zero-dependência**. Logo
-     **não pode** entrar no caminho padrão do `send`.
-   - **Forma proposta:** ferramenta **opt-in e separada** (ex.: `ekodide send --preparar-video`
-     ou um util `ekodide video --faststart <arq>`), que age **antes** do envio, avisa que
-     vai gerar um arquivo novo (sha256 diferente, de propósito) e só roda se houver ffmpeg
-     no PATH (degrada com recado claro se não houver). Mantém o núcleo intocado: quem não
-     pedir, continua recebendo o byte-idêntico de sempre.
+## Notas de campo
 
-## Notas de campo (provado em 2026-06-18)
-
-- Transferência **nos dois sentidos** por Wi-Fi, firewall ligado, sha256 idêntico.
-- No Android: roda no **Termux** e sobe sozinho no boot via **Termux:Boot** (ver
-  `contrib/termux/`). Pegadinha FBE: após reboot, o auto-start só dispara **depois
-  do 1º desbloqueio** (a pasta do Termux fica cifrada até lá).
-- Firewall (Fedora): liberar a porta de entrada e **reiniciar o firewalld**
+- **2026-06-20:** mp4/mp3 chegam byte-idênticos (teste automatizado, inclusive picado);
+  retomada após queda; keep-alive + pedaço 16 MB; **cifra AES-256-GCM** provada em
+  laboratório (teste que espiona a rede: conteúdo não vai em claro) **e** PC↔PC em 2
+  processos reais (sha idêntico). 60 testes passando.
+- **2026-06-18:** transferência nos dois sentidos por Wi-Fi, firewall ligado, sha256
+  idêntico.
+- Firewall (Fedora): liberar a porta e **reiniciar o firewalld**
   (`systemctl restart firewalld`) — um `--reload` sozinho pode não aplicar.
+
+## Pra mim (Claude) — máquina do Matheus
+
+- PC **fraquinho (4 GB de RAM)**: **NÃO** rodar testes de transferência de **vários GB**
+  aqui (já travou a máquina 2x lendo arquivo inteiro pra RAM). O Ekodide é leve (processa
+  em pedaços), mas teste que faz `read_bytes()` do arquivo todo estoura. Use arquivos
+  modestos + hash em streaming. `/tmp` é tmpfs pequeno (~368 MB) — trabalhar em `~/.cache`.
