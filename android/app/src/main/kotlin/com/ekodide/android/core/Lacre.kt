@@ -2,14 +2,14 @@ package com.ekodide.android.core
 
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlin.math.abs
+
+/** Mensagem recusada pela fechadura (assinatura, formato ou tempo). */
+class TrancaInvalida(mensagem: String) : Exception(mensagem)
 
 /**
  * O lacre: assina/verifica cada mensagem com o segredo (HMAC-SHA256). O segredo
  * NUNCA trafega. Espelho byte-idêntico do lacre.py.
- *
- * Esta parte cobre o lado de PRODUÇÃO (assinar/empacotar), provável de testar no
- * JVM contra os vetores-ouro. A verificação (desempacotar) precisa de um parser
- * JSON e entra junto com o servidor.
  */
 object Lacre {
     private const val HEX = "0123456789abcdef"
@@ -36,8 +36,48 @@ object Lacre {
         return CanonicalJson.encode(envelope).toByteArray(Charsets.UTF_8)
     }
 
+    /**
+     * Verifica assinatura e tempo; devolve a carga. Lança TrancaInvalida se algo não
+     * bate. Espelha lacre.desempacotar — inclusive a re-canonicalização da carga
+     * (json.loads + re-dump canônico) pra recalcular o HMAC.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun desempacotar(corpo: ByteArray, segredo: String, agora: Long? = null): Map<String, Any?> {
+        val envelope = try {
+            JsonParser.parse(String(corpo, Charsets.UTF_8)) as? Map<String, Any?>
+        } catch (e: Exception) {
+            throw TrancaInvalida("mensagem malformada")
+        } ?: throw TrancaInvalida("mensagem malformada")
+
+        val carga = envelope["carga"] as? Map<String, Any?>
+            ?: throw TrancaInvalida("mensagem malformada")
+        val assinatura = envelope["assinatura"] as? String
+            ?: throw TrancaInvalida("mensagem malformada")
+
+        val esperada = assinar(CanonicalJson.encode(carga).toByteArray(Charsets.UTF_8), segredo)
+        if (!comparaConstante(esperada, assinatura)) {
+            throw TrancaInvalida("assinatura não confere (segredo errado ou corpo adulterado)")
+        }
+
+        val ts = carga["ts"] as? Long ?: throw TrancaInvalida("sem carimbo de tempo")
+        val n = agora ?: (System.currentTimeMillis() / 1000)
+        if (abs(n - ts) > JANELA_SEGUNDOS) {
+            throw TrancaInvalida("mensagem fora da janela de tempo (possível repetição)")
+        }
+        return carga
+    }
+
+    /** Comparação em tempo constante (não vaza por timing), como hmac.compare_digest. */
+    private fun comparaConstante(a: String, b: String): Boolean {
+        val ab = a.toByteArray(Charsets.UTF_8)
+        val bb = b.toByteArray(Charsets.UTF_8)
+        if (ab.size != bb.size) return false
+        var dif = 0
+        for (k in ab.indices) dif = dif or (ab[k].toInt() xor bb[k].toInt())
+        return dif == 0
+    }
+
     // Hex minúsculo correto: mascara pra 0xFF e zera-preenche 2 chars por byte.
-    // (o "%x"/String.format ingênuo erra com bytes >= 0x80 e < 0x10.)
     private fun ByteArray.toHexLower(): String {
         val sb = StringBuilder(size * 2)
         for (b in this) {
