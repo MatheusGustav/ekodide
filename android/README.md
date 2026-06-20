@@ -60,9 +60,12 @@ Catálogo em `gradle/libs.versions.toml` (bumpar = uma linha).
   (grava cercado + retomada), `server/Recebedor` (rotas `/receber` + `/progresso`) e
   `server/ServidorHttp` (porta 8778, ServerSocket cru, keep-alive). Provado por POST real
   no JVM e no emulador, inclusive recebendo um arquivo gerado pelo carteiro do Python.
-- [ ] **Etapa 3** — `/listar` + `/buscar` (puxar) no Recebedor/ServidorHttp; cliente
-  `Acervo` (leitura cercada, espelho do `acervo.py`); descoberta UDP (8779, `vizinhanca.py`);
-  pareamento por frase (`frase.py`).
+- [x] **Etapa 3** — "puxar" + achar na rede + parear. `core/Acervo` (leitura cercada,
+  espelho do `acervo.py`); rotas `/listar` + `/buscar` no `Recebedor`/`ServidorHttp`
+  (entrega CIFRADA, exposição opt-in via `compartilhar`); descoberta UDP `net/Vizinhanca`
+  (8779, anuncia/procura, espelho do `vizinhanca.py`); `core/Frase` (pareamento por
+  frase-código, espelho do `frase.py`). Tudo provado no JVM e no emulador. **Falta o
+  MulticastLock pra RECEBER broadcast no Android — vem na Etapa 4.**
 - [ ] **Etapa 4** — foreground service `connectedDevice` (passivo de verdade: tela apagada/boot),
   WifiLock HIGH_PERF, MulticastLock, BootReceiver, isenção de bateria. **A parte difícil.**
 - [ ] **Etapa 5** — UI (status/pasta via SAF/frase), ícone, assinar APK pra sideload.
