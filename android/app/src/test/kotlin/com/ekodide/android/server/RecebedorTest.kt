@@ -92,4 +92,73 @@ class RecebedorTest {
         val corpo = Lacre.empacotar(linkedMapOf<String, Any?>("oi" to "mundo"), secret)
         assertEquals(404, Recebedor.tratar("/inexistente", corpo, secret, base).status)
     }
+
+    /** Corpo de /buscar (só lacrado: o pedido não leva conteúdo). */
+    private fun corpoBuscar(nome: String, parte: Int, partes: Int): ByteArray =
+        Lacre.empacotar(
+            linkedMapOf<String, Any?>("nome" to nome, "parte" to parte, "partes" to partes), secret,
+        )
+
+    @Test
+    fun listar_devolve_a_pasta_compartilhada() {
+        val base = tempBase()
+        val compart = tempBase()
+        File(compart, "Fotos").mkdirs()
+        File(compart, "Fotos/a.png").writeBytes(byteArrayOf(1, 2))
+        File(compart, "b.txt").writeBytes(byteArrayOf(9))
+
+        val corpo = Lacre.empacotar(linkedMapOf<String, Any?>(), secret)
+        val resp = Recebedor.tratar("/listar", corpo, secret, base, compartilhar = compart)
+        assertEquals(200, resp.status)
+
+        @Suppress("UNCHECKED_CAST")
+        val itens = Lacre.desempacotar(resp.corpo, secret)["itens"] as List<Map<String, Any?>>
+        assertEquals(listOf("Fotos/a.png", "b.txt"), itens.map { it["nome"] })
+        assertEquals(listOf(2L, 1L), itens.map { it["tamanho"] })
+    }
+
+    @Test
+    fun listar_vazio_quando_nada_compartilhado() {
+        val base = tempBase()
+        val corpo = Lacre.empacotar(linkedMapOf<String, Any?>(), secret)
+        val resp = Recebedor.tratar("/listar", corpo, secret, base) // sem compartilhar
+        assertEquals(200, resp.status)
+        @Suppress("UNCHECKED_CAST")
+        val itens = Lacre.desempacotar(resp.corpo, secret)["itens"] as List<Map<String, Any?>>
+        assertTrue(itens.isEmpty())
+    }
+
+    @Test
+    fun buscar_entrega_pedaco_cifrado_que_decifra_identico() {
+        val base = tempBase()
+        val compart = tempBase()
+        val dados = ByteArray(200) { (it * 3).toByte() }
+        File(compart, "arq.bin").writeBytes(dados)
+
+        val resp = Recebedor.tratar("/buscar", corpoBuscar("arq.bin", 0, 1), secret, base, compartilhar = compart)
+        assertEquals(200, resp.status)
+
+        val carga = Lacre.desempacotar(resp.corpo, secret)
+        assertEquals("arq.bin", carga["nome"])
+        assertEquals(0L, carga["parte"])
+        assertEquals(1L, carga["partes"])
+        // na rede veio cifrado; decifrar tem que devolver byte-idêntico
+        val aberto = Cofre.decifrar(Base64.getDecoder().decode(carga["conteudo"] as String), secret)
+        assertArrayEquals(dados, aberto)
+    }
+
+    @Test
+    fun buscar_sem_compartilhar_da_403() {
+        val base = tempBase()
+        val resp = Recebedor.tratar("/buscar", corpoBuscar("x", 0, 1), secret, base) // sem compartilhar
+        assertEquals(403, resp.status)
+    }
+
+    @Test
+    fun buscar_arquivo_inexistente_da_400() {
+        val base = tempBase()
+        val compart = tempBase()
+        val resp = Recebedor.tratar("/buscar", corpoBuscar("sumido.txt", 0, 1), secret, base, compartilhar = compart)
+        assertEquals(400, resp.status)
+    }
 }

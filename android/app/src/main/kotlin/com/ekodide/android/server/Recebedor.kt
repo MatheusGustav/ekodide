@@ -1,5 +1,6 @@
 package com.ekodide.android.server
 
+import com.ekodide.android.core.Acervo
 import com.ekodide.android.core.CaixaPostal
 import com.ekodide.android.core.Cofre
 import com.ekodide.android.core.Lacre
@@ -24,7 +25,9 @@ object Recebedor {
 
     /**
      * Trata uma requisição. `agora` (epoch s) só pra teste fixar o relógio do lacre;
-     * em produção fica null (= relógio atual).
+     * em produção fica null (= relógio atual). `compartilhar` é a pasta que o admin pode
+     * PUXAR (rotas /listar e /buscar) — null (padrão) = nada exposto: o "puxar" é opt-in,
+     * nada vaza sem o app apontar uma pasta.
      */
     fun tratar(
         rota: String,
@@ -32,6 +35,7 @@ object Recebedor {
         segredo: String,
         base: File,
         agora: Long? = null,
+        compartilhar: File? = null,
     ): Resposta {
         val carga = try {
             Lacre.desempacotar(corpo, segredo, agora)
@@ -41,6 +45,8 @@ object Recebedor {
         return when (rota) {
             "/receber" -> receber(carga, segredo, base)
             "/progresso" -> progresso(carga, segredo, base)
+            "/listar" -> listar(segredo, compartilhar)
+            "/buscar" -> buscar(carga, segredo, compartilhar)
             else -> texto(404, "rota desconhecida")
         }
     }
@@ -80,6 +86,48 @@ object Recebedor {
         val tamanho = (carga["tamanho"] as? Long) ?: -1L
         val recebidos = CaixaPostal.progressoDe(nome, partes, base, tamanho)
         return selar(mapOf("recebidos" to recebidos.toLong()), segredo)
+    }
+
+    /**
+     * Diz o que dá pra PUXAR daqui: a lista da pasta compartilhada (vazia se este
+     * aparelho não compartilha nada). O lacre já foi exigido em `tratar` — só responde a
+     * quem tem o segredo.
+     */
+    private fun listar(segredo: String, compartilhar: File?): Resposta {
+        val itens = Acervo.listar(compartilhar).map {
+            mapOf("nome" to it.nome, "tamanho" to it.tamanho)
+        }
+        return selar(mapOf("itens" to itens), segredo)
+    }
+
+    /**
+     * Entrega UM pedaço de um arquivo da pasta compartilhada, CIFRADO (cofre) — na rede
+     * passa só embaralhado, como no /receber. Recusa se nada é compartilhado ou se o nome
+     * tentar escapar da pasta.
+     */
+    private fun buscar(carga: Map<String, Any?>, segredo: String, compartilhar: File?): Resposta {
+        if (compartilhar == null) {
+            return texto(403, "este aparelho não compartilha nada (sirva com --compartilhar)")
+        }
+        val nome = carga["nome"] as? String ?: return texto(400, "pedido inválido: nome")
+        val parte = (carga["parte"] as? Long)?.toInt() ?: return texto(400, "pedido inválido: parte")
+        val partes = (carga["partes"] as? Long)?.toInt() ?: return texto(400, "pedido inválido: partes")
+        val bruto = try {
+            Acervo.lerPedaco(nome, compartilhar, parte, partes)
+        } catch (e: Exception) {
+            return texto(400, "pedido inválido: ${e.message}")
+        }
+        // CIFRA antes de mandar: na rede passa só o cofre, igual ao /receber.
+        val cifrado = Base64.getEncoder().encodeToString(Cofre.cifrar(bruto, segredo))
+        return selar(
+            mapOf(
+                "nome" to nome,
+                "parte" to parte.toLong(),
+                "partes" to partes.toLong(),
+                "conteudo" to cifrado,
+            ),
+            segredo,
+        )
     }
 
     private fun selar(dados: Map<String, Any?>, segredo: String): Resposta =
