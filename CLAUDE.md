@@ -25,11 +25,16 @@ roda `send`. Uso completo no [README](README.md).
 
 ## Decisões travadas (não reabrir sem motivo)
 
-- **Zero dependências de propósito** (só stdlib): leve, instala em qualquer lugar,
-  roda no Termux sem dor, dá pra empacotar como arquivo único. Não adicionar libs
-  sem necessidade real.
+- **Zero dependências é PREFERÊNCIA, não regra** (corrigido 2026-06-20 pelo Matheus
+  Gustav — o "decisão travada" foi o Claude que endureceu). Prefere-se só stdlib (leve,
+  instala em qualquer lugar, roda no Termux sem dor, dá pra empacotar como arquivo
+  único), MAS dá pra somar dependência se houver motivo real — desde que seja a
+  **melhor possível, gratuita e sem API paga**. Não adicionar lib à toa.
 - **Mesma rede (Wi-Fi)** por enquanto. O lacre garante autenticidade/integridade/
-  recência, mas **NÃO cifra** — internet/"rua" pediria somar TLS + nonce (fora de escopo).
+  recência. Cifrar o conteúdo (esconder de todos menos remetente/destinatário) deixou
+  de ser "fora de escopo" — o Matheus pediu (2026-06-20). Caminho recomendado:
+  `cryptography` (AES-GCM) chaveada pelo segredo que as pontas já compartilham (a
+  frase-código), mantendo o arquivo entregue byte-idêntico (decifra = inverso exato).
 - Segurança é **código determinístico** (lacre), não confiada a modelo.
 
 ## Como rodar / testar
@@ -108,6 +113,25 @@ pytest -q                                                       # testes (lacre,
      deixava o celular ativo (cliente), o oposto do que o Matheus quer.
    - **Quando for fazer:** app Android (e talvez iOS) que roda o papel de recebedor/
      servidor; provavelmente fora do escopo "stdlib Python puro" — é outra stack.
+
+4. **Funcionalidade: preparar vídeo MP4 na transferência (anotado 2026-06-19).**
+   Ideia do Matheus: ao mandar um `.mp4`, ter um passo que deixa o vídeo **pronto pra
+   tocar/postar** no destino — não só copiar os bytes.
+   - **Por que surgiu (caso real):** um `.mp4` de gravador (fragmentado — `moov`
+     minúsculo + vários `mdat`, frame rate variável) chega cópia perfeita, mas a Galeria
+     mostra **00:00** e o WhatsApp recusa. O Ekodide cumpriu a promessa (sha256 idêntico),
+     só que **cópia perfeita de um vídeo torto continua torto**. Conserto que funcionou:
+     remux pra MP4 padrão (`moov` no início + `+faststart`) e, pra garantir, reencode
+     H.264 High / yuv420p / 30fps CFR.
+   - **TENSÃO DE DESIGN (decidir antes de codar):** preparar vídeo **quebra dois pilares**
+     do projeto — (a) muda os bytes, então **sha256 deixa de bater** (a ponta "repete com
+     perfeição" some); (b) precisa de **ffmpeg**, furando o **zero-dependência**. Logo
+     **não pode** entrar no caminho padrão do `send`.
+   - **Forma proposta:** ferramenta **opt-in e separada** (ex.: `ekodide send --preparar-video`
+     ou um util `ekodide video --faststart <arq>`), que age **antes** do envio, avisa que
+     vai gerar um arquivo novo (sha256 diferente, de propósito) e só roda se houver ffmpeg
+     no PATH (degrada com recado claro se não houver). Mantém o núcleo intocado: quem não
+     pedir, continua recebendo o byte-idêntico de sempre.
 
 ## Notas de campo (provado em 2026-06-18)
 
