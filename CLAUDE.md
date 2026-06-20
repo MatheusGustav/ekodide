@@ -11,6 +11,7 @@ Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do
 | arquivo | papel |
 |---|---|
 | `ekodide/lacre.py` | fechadura HMAC — o segredo NUNCA trafega (assina/verifica + janela de tempo) |
+| `ekodide/cofre.py` | cifra o CONTEÚDO (AES-256-GCM, chave via HKDF do segredo) — embaralha na rede, entrega byte-idêntico; depende de `cryptography` |
 | `ekodide/carteiro.py` | ENVIA arquivo/pasta; arquivo grande vai **picado**; devolve `EnvioResultado` neutro |
 | `ekodide/caixa_postal.py` | grava cercado (sem travessia/sobrescrita) e remonta pedaços — pura, recebe a pasta `base` |
 | `ekodide/recebedor.py` | servidor HTTP leve que escuta e grava |

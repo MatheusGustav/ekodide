@@ -9,8 +9,8 @@ propósito. O lacre prova:
   - a mensagem é recente          (carimbo de tempo: limita repetição a uma janela curta)
 
 É o MESMO lacre para Wi-Fi agora e para a internet depois — ele viaja com a
-mensagem, não depende do cano. O que falta para a 'rua' é somar TLS (cifrar o
-conteúdo) e um nonce (matar repetição dentro da janela); o lacre não se joga fora.
+mensagem, não depende do cano. O conteúdo já vai cifrado à parte (ver cofre.py,
+AES-256-GCM); o lacre cuida de autenticidade/integridade/recência, não de esconder.
 """
 from __future__ import annotations
 

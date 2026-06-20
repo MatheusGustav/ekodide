@@ -182,6 +182,7 @@ Receita pronta em [`contrib/termux/`](contrib/termux/).
 | cômodo | papel |
 |---|---|
 | `lacre.py` | fechadura HMAC — o segredo nunca trafega |
+| `cofre.py` | cifra o conteúdo (AES-256-GCM) — embaralhado na rede, idêntico no destino |
 | `carteiro.py` | envia arquivo/pasta; arquivo grande vai **picado** em pedaços |
 | `caixa_postal.py` | grava cercado (sem travessia, sem sobrescrever) e remonta os pedaços |
 | `recebedor.py` | servidor HTTP leve que escuta e grava |
@@ -193,9 +194,16 @@ Receita pronta em [`contrib/termux/`](contrib/termux/).
 
 ## Segurança (honesto)
 
-Mesma rede (Wi-Fi) por enquanto. O lacre garante autenticidade, integridade e
-recência (janela de 5 min), mas **não cifra** o conteúdo — sem TLS, os bytes
-trafegam visíveis na LAN. Internet/"rua" pediria somar TLS + nonce.
+Duas camadas, ambas chaveadas pelo segredo que as pontas compartilham (a frase-código
+do pareamento — nunca trafega):
+
+- **Lacre (HMAC-SHA256):** prova *quem* mandou, que ninguém mexeu no caminho, e que a
+  mensagem é recente (janela de 5 min).
+- **Cofre (AES-256-GCM):** **cifra o conteúdo** — na rede passa só embaralhado; só
+  remetente e destinatário leem. O arquivo gravado fica byte-idêntico ao original.
+
+Ainda é **mesma rede (Wi-Fi)** por foco, não por limite de cifra. O que falta pra
+"rua" (internet) é endereçamento/NAT, não proteção do conteúdo.
 
 ## Licença
 

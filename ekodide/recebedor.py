@@ -128,7 +128,7 @@ def servir(base: Path, segredo: str, host: str = "127.0.0.1", porta: int = 8778)
     onde = "só nesta máquina (localhost)" if host == "127.0.0.1" else "ABERTA na sua rede"
     print(f"Recebedor Ekodide ouvindo em {host}:{porta} — {onde}. Destino: {base}")
     if host != "127.0.0.1":
-        print("  aviso: sem TLS, o conteúdo dos arquivos trafega visível na LAN.")
+        print("  conteúdo cifrado (AES-256-GCM) com o segredo das pontas — embaralhado na rede.")
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:
