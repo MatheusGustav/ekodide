@@ -57,13 +57,13 @@ jobs:
           disable-animations: true
           # A action roda CADA LINHA do script como um sh -c separado (variáveis não
           # persistem entre linhas). Por isso vai tudo em UMA linha (scalar dobrado >-),
-          # com ';' separando: roda os testes, guarda o código, mata SÓ o qemu-system
-          # (não 'pkill -f emulator', que casa o próprio script) e sai com o código real.
+          # com ';' separando: roda os testes, guarda o código, mata o emulador via
+          # 'adb emu kill' (limpo) e sai com o código real. NÃO usar pkill -f: o padrão
+          # casaria a própria linha do script (que contém o nome do processo) e a mataria.
           script: >-
             ./gradlew connectedDebugAndroidTest --stacktrace;
             code=$?;
             adb -s emulator-5554 emu kill 2>/dev/null || true;
-            pkill -9 -f qemu-system 2>/dev/null || true;
             exit $code
 
       - name: Sobe relatórios instrumentados (se falhar)
