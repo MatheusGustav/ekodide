@@ -25,7 +25,7 @@ class ServidorHttpInstrumentedTest {
 
     @Test
     fun servidor_aceita_post_real_no_android() {
-        val base = File.createTempFile("ek", "dir").let { it.delete(); it.mkdirs(); it }
+        val base = java.nio.file.Files.createTempDirectory("ekodide-srv").toFile()
         val servidor = ServidorHttp(base, secret, porta = 0, host = "127.0.0.1")
         servidor.iniciar()
         try {
