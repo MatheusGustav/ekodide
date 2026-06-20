@@ -16,8 +16,7 @@ from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
 
-from . import caixa_postal
-from .acervo import PEDACO
+from . import acervo, caixa_postal
 from .carteiro import _Linha  # mesma conexão keep-alive do empurrar (reaproveitada)
 from .cofre import decifrar
 from .lacre import TrancaInvalida, desempacotar, empacotar
@@ -70,8 +69,9 @@ def puxar(
     nome: str, url: str, segredo: str, base: Path, tamanho: int | None = None
 ) -> tuple[bool, str]:
     """Puxa o arquivo `nome` da `url` pra dentro de `base` (lacrado/cifrado no caminho).
-    Arquivo grande vem PICADO e é remontado pela caixa postal. Se `tamanho` não vier,
-    descobre via /listar. Devolve (ok, destino-ou-motivo)."""
+    Arquivo grande vem PICADO e é remontado pela caixa postal. Se um download anterior
+    caiu no meio, RETOMA de onde parou (pula os pedaços que já estão no `.parcial` local).
+    Se `tamanho` não vier, descobre via /listar. Devolve (ok, destino-ou-motivo)."""
     if tamanho is None:
         try:
             disponivel = {i["nome"]: i["tamanho"] for i in listar(url, segredo)}
@@ -81,14 +81,18 @@ def puxar(
             return False, f"'{nome}' não está disponível pra puxar nessa origem"
         tamanho = int(disponivel[nome])
 
-    partes = max(1, (tamanho + PEDACO - 1) // PEDACO)
+    # acervo.PEDACO é a FONTE ÚNICA do tamanho do pedaço (servidor e cliente leem o
+    # mesmo) — ler em tempo de execução evita cópias dessincronizadas das duas pontas.
+    partes = max(1, (tamanho + acervo.PEDACO - 1) // acervo.PEDACO)
+    # RETOMADA: consulta o progresso LOCAL (eu mesmo gravo) e pula o que já baixei.
+    ja = caixa_postal.progresso_de(nome, partes, base, tamanho)
     linha = _Linha(url)
     destino = None
     try:
-        for parte in range(partes):
+        for parte in range(ja, partes):
             ok, payload = _pedir_pedaco(linha, nome, parte, partes, segredo)
             if not ok:
-                return False, f"pedaço {parte + 1}/{partes}: {payload}"
+                return False, f"pedaço {parte + 1}/{partes}: {payload} (rode o pull de novo pra retomar)"
             # grava reusando a caixa postal: mesma cerca + remontagem do empurrar.
             destino = caixa_postal.guardar_pedaco(nome, payload, parte, partes, base, tamanho)
     except (OSError, ValueError) as erro:

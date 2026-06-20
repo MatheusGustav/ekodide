@@ -7,7 +7,7 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from ekodide import buscador
+from ekodide import acervo, buscador
 from ekodide.recebedor import criar_handler
 
 SEGREDO = "chave-de-teste"
@@ -63,11 +63,39 @@ def test_puxa_de_subpasta(origem_servida):
 
 def test_puxa_grande_picado_remonta_identico(origem_servida, monkeypatch):
     url, compartilhada, destino = origem_servida
-    monkeypatch.setattr(buscador, "PEDACO", 4)  # 10 bytes -> 3 pedaços
+    monkeypatch.setattr(acervo, "PEDACO", 4)  # 10 bytes -> 3 pedaços
     grande = compartilhada / "grande.bin"
     grande.write_bytes(bytes(range(10)))
     ok, _ = buscador.puxar("grande.bin", url, SEGREDO, destino)
     assert ok and _sha(destino / "grande.bin") == _sha(grande)
+
+
+def test_puxar_retoma_de_onde_parou(origem_servida, monkeypatch):
+    """Simula a queda no meio: 2 dos 3 pedaços já estão no '.parcial' local. Um novo
+    pull tem que RETOMAR — pedir só o pedaço que falta — e fechar byte-idêntico."""
+    from ekodide import caixa_postal
+
+    url, compartilhada, destino = origem_servida
+    monkeypatch.setattr(acervo, "PEDACO", 4)  # 10 bytes -> 3 pedaços
+    grande = compartilhada / "grande.bin"
+    grande.write_bytes(bytes(range(10)))
+    # metade já baixada localmente (pedaços 0 e 1) — antes da rede 'cair'
+    caixa_postal.guardar_pedaco("grande.bin", bytes(range(0, 4)), 0, 3, destino, 10)
+    caixa_postal.guardar_pedaco("grande.bin", bytes(range(4, 8)), 1, 3, destino, 10)
+    assert caixa_postal.progresso_de("grande.bin", 3, destino, 10) == 2
+
+    buscas = []  # conta quantos /buscar saem: tem que ser só o pedaço que falta
+    original = buscador._Linha.postar
+
+    def conta(self, caminho, corpo):
+        if caminho == "/buscar":
+            buscas.append(caminho)
+        return original(self, caminho, corpo)
+
+    monkeypatch.setattr(buscador._Linha, "postar", conta)
+    ok, _ = buscador.puxar("grande.bin", url, SEGREDO, destino, tamanho=10)
+    assert ok and _sha(destino / "grande.bin") == _sha(grande)
+    assert len(buscas) == 1  # retomou: só o pedaço 2 foi puxado
 
 
 def test_conteudo_puxado_vai_cifrado_na_rede(origem_servida):
