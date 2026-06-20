@@ -82,8 +82,8 @@ class AcervoTest {
     fun travessia_e_nome_vazio_nao_escapam() {
         val base = tempBase()
         // '..' é DESCARTADO (igual ao acervo.py): "../x" vira base/x, não escapa.
-        escrever(base, "x.txt", byteArrayOf(7))
-        assertEquals(7L, Acervo.tamanhoDe("../x.txt", base))
+        escrever(base, "x.txt", byteArrayOf(7, 7, 7))
+        assertEquals(3L, Acervo.tamanhoDe("../x.txt", base))
         // nome que fica vazio depois de filtrar é inválido
         assertThrows(IllegalArgumentException::class.java) { Acervo.tamanhoDe("..", base) }
     }
