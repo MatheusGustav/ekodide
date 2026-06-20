@@ -53,11 +53,25 @@ Catálogo em `gradle/libs.versions.toml` (bumpar = uma linha).
 
 ## Roadmap (resumido)
 
-- [x] **Etapa 0/1** — scaffold + fábrica de APK (Actions) + núcleo de cifra com prova byte-idêntica.
-- [ ] **Etapa 2** — servidor HTTP (porta 8778): receber + `/progresso` (retomada).
-- [ ] **Etapa 3** — `/listar` + `/buscar` (puxar), descoberta UDP (8779), pareamento por frase.
-- [ ] **Etapa 4** — foreground service `connectedDevice` (passivo de verdade: tela apagada/boot).
-- [ ] **Etapa 5** — UI (status/pasta/frase), ícone, assinar APK pra sideload.
+- [x] **Etapa 0** — scaffold + fábrica de APK no Actions (lane de emulador robusta).
+- [x] **Etapa 1** — núcleo de cifra byte-idêntico: `core/CanonicalJson`, `Lacre`, `Hkdf`,
+  `Cofre` (provado vs vetores do Python real + RFC 5869, no JVM e no emulador).
+- [x] **Etapa 2** — servidor: `core/JsonParser`, `Lacre.desempacotar`, `core/CaixaPostal`
+  (grava cercado + retomada), `server/Recebedor` (rotas `/receber` + `/progresso`) e
+  `server/ServidorHttp` (porta 8778, ServerSocket cru, keep-alive). Provado por POST real
+  no JVM e no emulador, inclusive recebendo um arquivo gerado pelo carteiro do Python.
+- [ ] **Etapa 3** — `/listar` + `/buscar` (puxar) no Recebedor/ServidorHttp; cliente
+  `Acervo` (leitura cercada, espelho do `acervo.py`); descoberta UDP (8779, `vizinhanca.py`);
+  pareamento por frase (`frase.py`).
+- [ ] **Etapa 4** — foreground service `connectedDevice` (passivo de verdade: tela apagada/boot),
+  WifiLock HIGH_PERF, MulticastLock, BootReceiver, isenção de bateria. **A parte difícil.**
+- [ ] **Etapa 5** — UI (status/pasta via SAF/frase), ícone, assinar APK pra sideload.
+
+> **Como retomar:** o miolo está em `app/src/main/kotlin/com/ekodide/android/{core,server}`,
+> espelhando os módulos Python homônimos em `../ekodide/`. Todo byte-exato é provado por
+> teste contra vetores do Python (`app/src/test/.../CryptoVectorsTest.kt` e afins). O loop
+> de trabalho é: escrever → push na branch `app` → ler o CI → corrigir. Os gotchas do CI
+> de emulador estão comentados em `.github/workflows/android-instrumented.yml`.
 
 > **Verdade dura (OEMs):** passivo 24/7 zero-config não existe em Xiaomi/Huawei/OnePlus —
 > exige o usuário liberar autostart/bateria, e o lado PC tem que tolerar o celular sumir.
