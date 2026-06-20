@@ -117,6 +117,33 @@ def test_pedaco_fora_de_ordem_recusado(tmp_path):
         guardar_pedaco("g.bin", b"CCCC", 2, 3, tmp_path, 12)  # pulou o pedaço 1
 
 
+def test_conteudo_vai_cifrado_na_rede(servidor, tmp_path):
+    """O que importa do cofre na prática: o conteúdo NÃO trafega em claro. Espiamos
+    cada corpo que sai e confirmamos que o texto-segredo não aparece — mas o arquivo
+    chega byte-idêntico mesmo assim."""
+    url, base = servidor
+    marca = b"SENHA-SUPER-SECRETA-1234567890"
+    origem = tmp_path / "segredo.txt"
+    origem.write_bytes(b"prefixo " + marca + b" sufixo")
+
+    capturado = []
+    original = carteiro._Linha.postar
+
+    def espiao(self, caminho, corpo):
+        capturado.append(corpo)
+        return original(self, caminho, corpo)
+
+    carteiro._Linha.postar = espiao
+    try:
+        r = enviar(origem, url, SEGREDO)
+    finally:
+        carteiro._Linha.postar = original
+
+    assert r.ok
+    assert (base / "segredo.txt").read_bytes() == origem.read_bytes()  # idêntico
+    assert capturado and all(marca not in corpo for corpo in capturado)  # nada em claro
+
+
 def test_segredo_errado_nao_grava(servidor, tmp_path):
     url, base = servidor
     origem = tmp_path / "x.txt"

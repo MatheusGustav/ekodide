@@ -10,9 +10,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Matheus Gustav" }]
 license = { text = "MIT" }
-keywords = ["file-transfer", "hmac", "lan", "wifi", "stdlib", "zero-dependencies", "termux"]
-# Zero dependências de propósito: só a stdlib (urllib, http.server, hmac).
-dependencies = []
+keywords = ["file-transfer", "hmac", "aes-gcm", "encryption", "lan", "wifi", "termux"]
+# Quase tudo é stdlib (urllib, http.server, hmac). A única dependência é a
+# `cryptography`: AES-256-GCM pra cifrar o conteúdo (cofre.py) — AES não existe na
+# stdlib, e esconder o conteúdo na rede vale a dependência.
+dependencies = ["cryptography>=42"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",

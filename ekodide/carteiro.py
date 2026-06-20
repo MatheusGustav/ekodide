@@ -18,6 +18,7 @@ import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .cofre import cifrar
 from .lacre import TrancaInvalida, desempacotar, empacotar
 
 TIMEOUT_S = 30  # mata o POST se a rede travar
@@ -95,7 +96,9 @@ def _postar(
     retomada); senão é o arquivo inteiro de uma vez. `nome` pode ser caminho relativo
     ('Fotos/sub/img.png'). Devolve (ok, info): info é o destino (preenchido no último
     pedaço) ou o motivo da falha."""
-    carga = {"nome": nome, "conteudo": base64.b64encode(dados).decode("ascii")}
+    # CIFRA o conteúdo antes de mandar: na rede passa só embaralhado (o cofre). A
+    # chave sai do segredo; o destino decifra e grava byte-idêntico ao original.
+    carga = {"nome": nome, "conteudo": base64.b64encode(cifrar(dados, segredo)).decode("ascii")}
     if partes is not None:
         carga["parte"], carga["partes"] = parte, partes
         if tamanho is not None:

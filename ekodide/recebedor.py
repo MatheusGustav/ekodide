@@ -10,11 +10,15 @@ Uso direto:
 """
 from __future__ import annotations
 
+import base64
 import binascii
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from cryptography.exceptions import InvalidTag
+
 from .caixa_postal import gravar_recebido, progresso_de
+from .cofre import decifrar
 from .lacre import TrancaInvalida, desempacotar, empacotar
 
 # Teto do corpo: base64 incha ~33%, então ~32 MB aqui ≈ ~24 MB de arquivo real.
@@ -57,6 +61,15 @@ def criar_handler(base: Path, segredo: str) -> type[BaseHTTPRequestHandler]:
         def _receber(self) -> None:
             carga = self._ler_carga()
             if carga is None:
+                return
+            # DECIFRA o conteúdo (o cofre) — na rede veio embaralhado. Daqui pra frente
+            # a caixa postal lida com o texto-claro, como sempre.
+            try:
+                cifrado = base64.b64decode(carga["conteudo"], validate=True)
+                aberto = base64.b64encode(decifrar(cifrado, segredo)).decode("ascii")
+                carga = {**carga, "conteudo": aberto}
+            except (KeyError, binascii.Error, InvalidTag) as erro:
+                self._texto(400, f"conteúdo não abriu o cofre: {erro}")
                 return
             # GRAVA, com o nome cercado na pasta permitida.
             try:
