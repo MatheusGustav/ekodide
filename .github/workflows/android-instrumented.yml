@@ -18,7 +18,11 @@ defaults:
 jobs:
   instrumented-test:
     runs-on: ubuntu-latest        # runner free 2-vCPU TEM KVM (confirmado abr/2024)
-    timeout-minutes: 45
+    timeout-minutes: 25
+    env:
+      # O android-emulator-runner às vezes trava no desligamento do emulador
+      # ("stop: Not implemented") e pendura o job. Mata na hora em vez de esperar.
+      ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL: 0
     strategy:
       fail-fast: false
       matrix:
