@@ -39,14 +39,18 @@ class CaixaPostalTest {
     }
 
     @Test
-    fun bloqueia_travessia_de_caminho() {
+    fun travessia_fica_dentro_da_base() {
         val base = tempBase()
+        // '..' é DESCARTADO (igual ao caixa_postal.py): nunca escapa, grava dentro.
+        val a = CaixaPostal.guardar("../fora.txt", byteArrayOf(0), base)
+        assertEquals(File(base, "fora.txt").canonicalPath, a.canonicalPath)
+        // componente '..' no meio também é só descartado (vira base/a/b.txt)
+        val b = CaixaPostal.guardar("a/../b.txt", byteArrayOf(7), base)
+        assertEquals(File(base, "a/b.txt").canonicalPath, b.canonicalPath)
+        // nome que fica vazio depois de filtrar é inválido -> lança
         assertThrows(IllegalArgumentException::class.java) {
-            CaixaPostal.guardar("../fora.txt", byteArrayOf(0), base)
+            CaixaPostal.guardar("..", byteArrayOf(0), base)
         }
-        // '..' no meio também é descartado -> grava dentro, não escapa
-        val alvo = CaixaPostal.guardar("a/../b.txt", byteArrayOf(7), base)
-        assertEquals(File(base, "b.txt").canonicalPath, alvo.canonicalPath)
     }
 
     @Test
