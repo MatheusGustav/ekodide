@@ -58,6 +58,22 @@ def test_arquivo_grande_picado_remonta_identico(servidor, tmp_path, monkeypatch)
     assert r.ok and _sha(base / "grande.bin") == _sha(origem)
 
 
+def test_midia_mp4_mp3_chega_identica(servidor, tmp_path, monkeypatch):
+    """Mídia (mp4/mp3) é só bytes pro Ekodide — tem que chegar igualzinha, inclusive
+    PICADA. Forjamos os bytes na hora (sem ffmpeg) pra travar a 'cópia perfeita'
+    contra regressão. NÃO testa tocabilidade: 'tratar' vídeo é fora de escopo."""
+    url, base = servidor
+    monkeypatch.setattr(carteiro, "PEDACO", 64 * 1024)  # força o mp4 a ir em pedaços
+    # cabeçalhos plausíveis + miolo binário variado; o mp4 passa do PEDACO de propósito
+    mp4 = tmp_path / "video.mp4"
+    mp4.write_bytes(b"\x00\x00\x00\x18ftypmp42" + bytes(range(256)) * 700)
+    mp3 = tmp_path / "musica.mp3"
+    mp3.write_bytes(b"ID3\x03\x00\x00\x00" + bytes(range(256)) * 4)
+    for origem in (mp4, mp3):
+        r = enviar(origem, url, SEGREDO)
+        assert r.ok and _sha(base / origem.name) == _sha(origem)
+
+
 def test_segredo_errado_nao_grava(servidor, tmp_path):
     url, base = servidor
     origem = tmp_path / "x.txt"
