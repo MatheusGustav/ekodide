@@ -17,6 +17,8 @@ Como comando (depois de instalar):
 """
 from __future__ import annotations
 
+from .buscador import ErroPuxar, puxar
+from .buscador import listar as listar_remoto
 from .caixa_postal import gravar_recebido, guardar, guardar_pedaco
 from .carteiro import EnvioResultado, enviar
 from .lacre import (
@@ -35,6 +37,9 @@ __version__ = "0.1.0"
 __all__ = [
     "enviar",
     "EnvioResultado",
+    "puxar",
+    "listar_remoto",
+    "ErroPuxar",
     "servir",
     "gravar_recebido",
     "guardar",

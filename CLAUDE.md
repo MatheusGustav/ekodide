@@ -15,12 +15,14 @@ Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do
 | `ekodide/cofre.py` | cifra o CONTEÚDO (AES-256-GCM, chave via HKDF do segredo) — embaralha na rede, entrega byte-idêntico; depende de `cryptography` |
 | `ekodide/carteiro.py` | ENVIA arquivo/pasta; grande vai **picado**; **retoma** de onde parou + **keep-alive** (conexão reusada); devolve `EnvioResultado` neutro |
 | `ekodide/caixa_postal.py` | grava cercado (sem travessia/sobrescrita) e remonta pedaços (anota progresso no `.parcial.meta`) — pura, recebe a pasta `base` |
-| `ekodide/recebedor.py` | servidor HTTP leve (HTTP/1.1) que escuta, decifra e grava; rota `/progresso` pra retomada |
+| `ekodide/acervo.py` | LÊ cercado a pasta COMPARTILHADA pro "puxar" (sem `../`, sem fuga por symlink) — espelho de leitura do caixa_postal; pura |
+| `ekodide/buscador.py` | PUXA arquivo de outra ponta (`/listar` + `/buscar`); decifra e grava reusando a caixa postal — espelho do carteiro |
+| `ekodide/recebedor.py` | servidor HTTP leve (HTTP/1.1) que escuta, decifra e grava; rota `/progresso` pra retomada; `/listar` + `/buscar` expõem a pasta compartilhada (puxar) |
 | `ekodide/vizinhanca.py` | descoberta na LAN (UDP broadcast 8779): anuncia presença / acha aparelhos pelo nome — IP vem do remetente, resolve DHCP |
 | `ekodide/frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band; a frase É o segredo) |
 | `ekodide/cortina.py` | detecta o firewall (firewalld/ufw) e monta/roda o comando pra liberar as portas (lado que recebe) |
 | `ekodide/config.py` | `~/.config/ekodide/config.json` (segredo + destinos + nome, cadeado 600) |
-| `ekodide/cli.py` | comando `ekodide` (`send` / `serve` / `devices` / `pair` / `firewall` / `config`) |
+| `ekodide/cli.py` | comando `ekodide` (`send` / `serve` / `list` / `pull` / `devices` / `pair` / `firewall` / `config`) |
 
 Modelo mental: **2 pontas** — quem RECEBE roda `serve` (caixa aberta), quem ENVIA
 roda `send`. Uso completo no [README](README.md).
@@ -42,12 +44,18 @@ roda `send`. Uso completo no [README](README.md).
 - Segurança é **código determinístico** (lacre + cofre), não confiada a modelo.
 - **Byte-idêntico é sagrado.** Nada no caminho padrão do `send` pode mudar os bytes
   entregues (é por isso que "preparar vídeo" fica fora — ver TODO #4).
+- **Puxar arquivo (em construção, 2026-06-20).** O admin pode PUXAR de outra ponta
+  (rotas `/listar` + `/buscar` no recebedor; cliente `buscador.py`; leitura cercada em
+  `acervo.py`). Exposição é **opt-in**: `serve --compartilhar <pasta>`, DESLIGADO por
+  padrão — nada vaza sem apontar a pasta. **Política de pastas é do app, não do
+  protocolo:** o core só recebe um caminho + a cerca de segurança (sem `../`); decidir
+  onde cada tipo de arquivo cai/aparece é do app Android, nunca do Python.
 
 ## Como rodar / testar
 
 ```bash
 pipx install git+https://github.com/MatheusGustav/ekodide.git   # ou pip install --user ...
-pytest -q   # 60 testes: lacre, cofre, caixa, voo (envio+cifra+retomada), config, cli, etc.
+pytest -q   # 79 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada), puxar, config, cli, etc.
 ```
 
 ## TODO / próximos passos (atualizado 2026-06-20)
@@ -111,7 +119,12 @@ pytest -q   # 60 testes: lacre, cofre, caixa, voo (envio+cifra+retomada), config
      pareia) ~1–2 semanas de trabalho focado; polida/loja, mais. Não é fim de semana,
      nem meses. A parte difícil é o Android (segundo plano/bateria, permissão de
      arquivos, gerar/assinar APK), não o protocolo (lacre/cofre já existem).
-   - **Linguagem: EM ABERTO** — Matheus ainda não decidiu (não cravar nada aqui).
+   - **Linguagem: Kotlin** (decidido 2026-06-20 pelo Matheus Gustav). O APK é escrito
+     em Kotlin nativo.
+   - **Seletor de pasta (Kotlin/app):** o `--compartilhar <pasta>` do core (do "puxar")
+     vira o seletor de pastas do Android (SAF) — o usuário ESCOLHE uma pasta que já
+     existe (rolo da câmera, Downloads, ou uma dedicada), sem copiar nada pra lugar novo.
+     É assim que o app aponta a pasta exposta pro "puxar".
    - **Quando for fazer:** app Android no papel de recebedor/servidor; outra stack
      (não é Python puro).
 

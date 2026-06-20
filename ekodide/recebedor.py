@@ -17,8 +17,9 @@ from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
 
+from . import acervo
 from .caixa_postal import gravar_recebido, progresso_de
-from .cofre import decifrar
+from .cofre import cifrar, decifrar
 from .lacre import TrancaInvalida, desempacotar, empacotar
 
 # Teto do corpo: base64 incha ~33%, então ~32 MB aqui ≈ ~24 MB de arquivo real.
@@ -26,8 +27,13 @@ from .lacre import TrancaInvalida, desempacotar, empacotar
 LIMITE_CORPO = 32 * 1024 * 1024
 
 
-def criar_handler(base: Path, segredo: str) -> type[BaseHTTPRequestHandler]:
-    """Fabrica um Handler amarrado a esta pasta e este segredo (sem estado global)."""
+def criar_handler(
+    base: Path, segredo: str, compartilhar: Path | None = None
+) -> type[BaseHTTPRequestHandler]:
+    """Fabrica um Handler amarrado a esta pasta e este segredo (sem estado global).
+
+    `compartilhar` é a pasta que o admin pode PUXAR (rotas /listar e /buscar). None
+    (padrão) = nada exposto pra leitura: o 'puxar' fica desligado."""
 
     class Handler(BaseHTTPRequestHandler):
         # HTTP/1.1 mantém a conexão viva entre pedaços (keep-alive): o carteiro
@@ -41,6 +47,10 @@ def criar_handler(base: Path, segredo: str) -> type[BaseHTTPRequestHandler]:
                 self._receber()
             elif self.path == "/progresso":
                 self._progresso()
+            elif self.path == "/listar":
+                self._listar()
+            elif self.path == "/buscar":
+                self._buscar()
             else:
                 self._texto(404, "rota desconhecida")
 
@@ -97,6 +107,34 @@ def criar_handler(base: Path, segredo: str) -> type[BaseHTTPRequestHandler]:
                 return
             self._selar({"recebidos": recebidos})
 
+        def _listar(self) -> None:
+            """Diz o que dá pra PUXAR daqui: a lista da pasta compartilhada (vazia se
+            este aparelho não compartilha nada). Só responde a quem tem o segredo."""
+            if self._ler_carga() is None:  # exige o lacre, mesmo sem usar a carga
+                return
+            self._selar({"itens": acervo.listar(compartilhar)})
+
+        def _buscar(self) -> None:
+            """Entrega UM pedaço de um arquivo da pasta compartilhada, CIFRADO (cofre).
+            Recusa se nada é compartilhado ou se o nome tentar escapar da pasta."""
+            carga = self._ler_carga()
+            if carga is None:
+                return
+            if compartilhar is None:
+                self._texto(403, "este aparelho não compartilha nada (sirva com --compartilhar)")
+                return
+            try:
+                nome = carga["nome"]
+                parte = int(carga["parte"])
+                partes = int(carga["partes"])
+                bruto = acervo.ler_pedaco(nome, compartilhar, parte, partes)
+            except (KeyError, ValueError) as erro:
+                self._texto(400, f"pedido inválido: {erro}")
+                return
+            # CIFRA antes de mandar: na rede passa só embaralhado (o cofre), como no /receber.
+            cifrado = base64.b64encode(cifrar(bruto, segredo)).decode("ascii")
+            self._selar({"nome": nome, "parte": parte, "partes": partes, "conteudo": cifrado})
+
         def _selar(self, dados: dict) -> None:
             """Responde 200 com o corpo lacrado (assinado com o segredo)."""
             selada = empacotar(dados, segredo)
@@ -120,13 +158,25 @@ def criar_handler(base: Path, segredo: str) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
-def servir(base: Path, segredo: str, host: str = "127.0.0.1", porta: int = 8778) -> None:
-    """Sobe o recebedor e bloqueia até Ctrl-C. Grava em `base`, lacrado com `segredo`."""
+def servir(
+    base: Path,
+    segredo: str,
+    host: str = "127.0.0.1",
+    porta: int = 8778,
+    compartilhar: Path | None = None,
+) -> None:
+    """Sobe o recebedor e bloqueia até Ctrl-C. Grava em `base`, lacrado com `segredo`.
+    `compartilhar` (opcional) é a pasta que o outro lado pode PUXAR; None = puxar off."""
     base = Path(base).expanduser()
     base.mkdir(parents=True, exist_ok=True)
-    servidor = ThreadingHTTPServer((host, porta), criar_handler(base.resolve(), segredo))
+    compartilhar = Path(compartilhar).expanduser().resolve() if compartilhar else None
+    servidor = ThreadingHTTPServer(
+        (host, porta), criar_handler(base.resolve(), segredo, compartilhar)
+    )
     onde = "só nesta máquina (localhost)" if host == "127.0.0.1" else "ABERTA na sua rede"
     print(f"Recebedor Ekodide ouvindo em {host}:{porta} — {onde}. Destino: {base}")
+    if compartilhar is not None:
+        print(f"  compartilhando pra PUXAR: {compartilhar}")
     if host != "127.0.0.1":
         print("  conteúdo cifrado (AES-256-GCM) com o segredo das pontas — embaralhado na rede.")
     try:

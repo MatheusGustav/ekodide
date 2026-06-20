@@ -97,6 +97,7 @@ def _cmd_serve(args) -> int:
     base = args.dir or receber.get("dir") or "~/Downloads"
     porta = args.porta or receber.get("porta") or 8778
     host = args.host or receber.get("host") or "127.0.0.1"
+    compartilhar = args.compartilhar or receber.get("compartilhar")
     try:
         segredo = config.segredo(cfg)
     except config.ErroConfig as erro:
@@ -111,7 +112,64 @@ def _cmd_serve(args) -> int:
         if fechadas:
             print(f"  dica: o firewall parece bloquear {', '.join(fechadas)} — "
                   f"libere com:  ekodide firewall --abrir")
-    servir(Path(base).expanduser(), segredo, host=host, porta=int(porta))
+    servir(
+        Path(base).expanduser(), segredo, host=host, porta=int(porta),
+        compartilhar=Path(compartilhar).expanduser() if compartilhar else None,
+    )
+    return 0
+
+
+def _tam_humano(n: int) -> str:
+    """Tamanho legível: 2.0 KB, 14.8 MB… (pra listagem do que dá pra puxar)."""
+    tam = float(n)
+    for unidade in ("B", "KB", "MB", "GB", "TB"):
+        if tam < 1024 or unidade == "TB":
+            return f"{int(tam)} {unidade}" if unidade == "B" else f"{tam:.1f} {unidade}"
+        tam /= 1024
+    return f"{n} B"
+
+
+def _cmd_pull(args) -> int:
+    from .buscador import puxar
+
+    try:
+        url = _resolver_destino(args.de, args.descobrir)
+        segredo = config.segredo()
+    except config.ErroConfig as erro:
+        print(erro, file=sys.stderr)
+        return 1
+    cfg = config.carregar()
+    destino_dir = args.dir or (cfg.get("receber") or {}).get("dir") or "~/Downloads"
+    ok, info = puxar(args.arquivo, url, segredo, Path(destino_dir).expanduser())
+    if ok:
+        print(f"Puxei '{args.arquivo}' de '{args.de}'. Salvo em: {info}")
+    else:
+        print(f"Não consegui puxar '{args.arquivo}': {info}", file=sys.stderr)
+    return 0 if ok else 1
+
+
+def _cmd_list(args) -> int:
+    from .buscador import ErroPuxar, listar
+
+    try:
+        url = _resolver_destino(args.de, args.descobrir)
+        segredo = config.segredo()
+    except config.ErroConfig as erro:
+        print(erro, file=sys.stderr)
+        return 1
+    try:
+        itens = listar(url, segredo)
+    except ErroPuxar as erro:
+        print(f"Não consegui listar de '{args.de}': {erro}", file=sys.stderr)
+        return 1
+    if not itens:
+        print(f"'{args.de}' não está compartilhando nada pra puxar "
+              f"(o outro lado serve com --compartilhar <pasta>?).")
+        return 0
+    print(f"Disponível em '{args.de}' pra puxar:")
+    for it in itens:
+        print(f"  {_tam_humano(it['tamanho']):>9}  {it['nome']}")
+    print(f"\nPuxe com:  ekodide pull <arquivo> --de {args.de}")
     return 0
 
 
@@ -279,7 +337,22 @@ def construir_parser() -> argparse.ArgumentParser:
     v.add_argument("--dir", help="pasta destino (padrão: config ou ~/Downloads)")
     v.add_argument("--porta", type=int, help="porta (padrão: config ou 8778)")
     v.add_argument("--host", help="0.0.0.0 pra abrir na LAN (padrão: 127.0.0.1)")
+    v.add_argument("--compartilhar", help="pasta que o outro lado pode PUXAR (padrão: nada exposto)")
     v.set_defaults(func=_cmd_serve)
+
+    pl = sub.add_parser("pull", help="puxa um arquivo que outro aparelho compartilha")
+    pl.add_argument("arquivo", help="nome do arquivo (como aparece no 'ekodide list')")
+    pl.add_argument("--de", required=True, help="aparelho de onde puxar (ex.: pc, celular)")
+    pl.add_argument("--dir", help="onde salvar (padrão: config ou ~/Downloads)")
+    pl.add_argument("--descobrir", action="store_true",
+                    help="acha a origem pela rede (ignora o IP da config)")
+    pl.set_defaults(func=_cmd_pull)
+
+    li = sub.add_parser("list", help="lista o que outro aparelho compartilha pra puxar")
+    li.add_argument("--de", required=True, help="aparelho a consultar (ex.: pc, celular)")
+    li.add_argument("--descobrir", action="store_true",
+                    help="acha a origem pela rede (ignora o IP da config)")
+    li.set_defaults(func=_cmd_list)
 
     d = sub.add_parser("devices", help="lista aparelhos Ekodide visíveis na rede (sem digitar IP)")
     d.add_argument("--tempo", type=float, default=2.5, help="segundos de escuta (padrão: 2.5)")

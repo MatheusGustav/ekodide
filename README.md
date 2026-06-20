@@ -121,8 +121,23 @@ por porta, precisa de um Prompt de Administrador) e **macOS** (Application Firew
 ekodide serve                      # escuta e grava o que chegar (padrão: ~/Downloads)
 ekodide serve --host 0.0.0.0       # abre na LAN (pra receber de outro aparelho)
 ekodide serve --dir ~/Recebidos    # escolhe a pasta destino
+ekodide serve --compartilhar ~/Publica   # deixa o outro lado PUXAR dessa pasta (ver abaixo)
 ```
 Deixe rodando num terminal; `Ctrl+C` para parar.
+
+### `list` / `pull` — puxar de outro aparelho
+
+O contrário do `send`: em vez de empurrar, você **puxa** um arquivo que o outro lado
+deixou disponível. O outro precisa estar servindo **com a pasta compartilhada**
+(`ekodide serve --compartilhar <pasta>`); sem isso, nada é exposto pra leitura.
+```bash
+ekodide list --de pc                  # vê o que o 'pc' compartilha pra puxar
+ekodide pull relatorio.pdf --de pc    # puxa o arquivo pra cá (padrão: ~/Downloads)
+ekodide pull Fotos/foto.jpg --de pc --dir ~/Recebidos   # de subpasta, salvando onde quiser
+```
+Puxar é **opt-in**: só funciona contra quem serviu com `--compartilhar`. O conteúdo
+volta cifrado (cofre) e lacrado (HMAC), e a pasta compartilhada é **cercada** — um
+pedido com `../` nunca escapa dela.
 
 ### `config` — ajustar
 ```bash
@@ -185,12 +200,14 @@ Em desenvolvimento.
 | `cofre.py` | cifra o conteúdo (AES-256-GCM) — embaralhado na rede, idêntico no destino |
 | `carteiro.py` | envia arquivo/pasta; arquivo grande vai **picado** em pedaços |
 | `caixa_postal.py` | grava cercado (sem travessia, sem sobrescrever) e remonta os pedaços |
-| `recebedor.py` | servidor HTTP leve que escuta e grava |
+| `acervo.py` | LÊ cercado a pasta compartilhada pro "puxar" (sem travessia, sem fuga por symlink) |
+| `buscador.py` | PUXA arquivo de outra ponta (pede, decifra, grava reusando a caixa postal) |
+| `recebedor.py` | servidor HTTP leve que escuta e grava (e expõe /listar e /buscar pro puxar) |
 | `vizinhanca.py` | descoberta na LAN: anuncia presença e acha aparelhos pelo nome (sem IP) |
 | `frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band) |
 | `cortina.py` | detecta o firewall e monta/roda o comando pra liberar as portas |
 | `config.py` | lê/grava `~/.config/ekodide/config.json` (segredo + destinos + nome) |
-| `cli.py` | o comando `ekodide` (send/serve/devices/pair/firewall/config) |
+| `cli.py` | o comando `ekodide` (send/serve/list/pull/devices/pair/firewall/config) |
 
 ## Segurança (honesto)
 
