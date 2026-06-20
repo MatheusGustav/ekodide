@@ -34,8 +34,6 @@ jobs:
 
       - name: Gradle (com cache)
         uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: android
 
       - name: Testes JVM (cifra byte-idêntica)
         run: ./gradlew testDebugUnitTest --stacktrace

@@ -2,7 +2,7 @@
 # Versões mid-2026 (conferir em Maven Central / developer.android.com ao subir o build).
 [versions]
 agp = "9.2.0"
-kotlin = "2.4.0"
+# Kotlin não tem entrada de plugin: o AGP 9 já embute o Kotlin (versão atrelada ao AGP).
 junit = "4.13.2"
 androidxTestExtJunit = "1.2.1"
 androidxTestRunner = "1.6.2"
@@ -14,4 +14,3 @@ androidx-test-runner = { group = "androidx.test", name = "runner", version.ref =
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

@@ -1,6 +1,7 @@
 plugins {
+    // AGP 9+ tem Kotlin embutido — NÃO se aplica mais o plugin kotlin.android
+    // (ver android/README e https://developer.android.com/build/migrate-to-built-in-kotlin).
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -32,10 +33,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-}
-
-kotlin {
-    jvmToolchain(17)
+    // O jvmTarget do Kotlin herda o targetCompatibility acima (17) no Kotlin embutido.
 }
 
 dependencies {

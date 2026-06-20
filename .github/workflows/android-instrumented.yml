@@ -35,8 +35,6 @@ jobs:
 
       - name: Gradle (com cache)
         uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: android
 
       # PASSO CRÍTICO: libera o /dev/kvm pro usuário do runner (sem isso o emulador
       # cai pra emulação por software e estoura o timeout).
