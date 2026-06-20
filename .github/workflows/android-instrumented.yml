@@ -18,15 +18,7 @@ defaults:
 jobs:
   instrumented-test:
     runs-on: ubuntu-latest        # runner free 2-vCPU TEM KVM (confirmado abr/2024)
-    timeout-minutes: 25
-    env:
-      # O android-emulator-runner às vezes trava no desligamento do emulador
-      # ("stop: Not implemented") e pendura o job. Mata na hora em vez de esperar.
-      ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL: 0
-    strategy:
-      fail-fast: false
-      matrix:
-        api-level: [29]
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,44 +42,33 @@ jobs:
           sudo udevadm trigger --name-match=kvm
         working-directory: .
 
-      - name: Cache do AVD
-        uses: actions/cache@v4
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-${{ matrix.api-level }}
-
-      - name: Cria o AVD e gera o snapshot (só no cache-miss)
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+      # Cold boot (sem cache de AVD) é mais confiável aqui que bootar de snapshot, que
+      # estava dando boot pela metade e travamento no desligamento. O script ainda MATA
+      # o emulador no fim (pkill) — assim o teardown da action não tem o que pendurar
+      # ("stop: Not implemented"), preservando o código de saída real dos testes.
+      - name: Roda os testes no emulador
         uses: reactivecircus/android-emulator-runner@v2.37.0
         with:
           working-directory: android
-          api-level: ${{ matrix.api-level }}
+          api-level: 29
           target: default
           arch: x86_64
-          force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          script: echo "snapshot do AVD gerado"
-
-      - name: Roda os testes instrumentados
-        uses: reactivecircus/android-emulator-runner@v2.37.0
-        with:
-          working-directory: android
-          api-level: ${{ matrix.api-level }}
-          target: default
-          arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest --stacktrace
+          script: |
+            set +e
+            ./gradlew connectedDebugAndroidTest --stacktrace
+            code=$?
+            echo "testes terminaram com codigo $code; matando o emulador"
+            adb -s emulator-5554 emu kill 2>/dev/null || true
+            pkill -9 -f qemu-system 2>/dev/null || true
+            pkill -9 -f emulator 2>/dev/null || true
+            exit $code
 
       - name: Sobe relatórios instrumentados (se falhar)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: instrumented-test-reports-api${{ matrix.api-level }}
+          name: instrumented-test-reports
           path: android/app/build/reports/androidTests/
           if-no-files-found: ignore
