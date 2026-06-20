@@ -101,8 +101,19 @@ pytest -q   # 60 testes: lacre, cofre, caixa, voo (envio+cifra+retomada), config
      (commit `482ddc9` desfez `9f4cd2f`) — deixava o celular ativo, o oposto do desejo.
    - **Termux:** o caminho via Termux foi **removido (2026-06-20)** — vai dar lugar ao
      app nativo. (Os scripts em `contrib/termux/` saíram do repo.)
-   - **Quando for fazer:** app Android (e talvez iOS) no papel de recebedor/servidor;
-     outra stack (não é Python puro).
+   - **ANDROID PRIMEIRO, iOS fica fora por ora (concluído 2026-06-20).** O iPhone
+     **não suporta o modelo passivo** que o Matheus quer: o iOS mata/suspende app que
+     tenta ficar "ouvindo" sozinho em segundo plano e a App Store rejeita servidor 24/7
+     — na prática só rodaria com o app aberto na tela, o oposto de "passivo". Logo NÃO
+     vale esforço cross-platform (Flutter/KMP) atrás do iOS; iPhone segue por PC↔PC. O
+     valor central (PC↔Android e PC↔PC) não depende do iOS.
+   - **Esforço estimado:** versão crua (recebe + dá pra puxar + roda em segundo plano +
+     pareia) ~1–2 semanas de trabalho focado; polida/loja, mais. Não é fim de semana,
+     nem meses. A parte difícil é o Android (segundo plano/bateria, permissão de
+     arquivos, gerar/assinar APK), não o protocolo (lacre/cofre já existem).
+   - **Linguagem: EM ABERTO** — Matheus ainda não decidiu (não cravar nada aqui).
+   - **Quando for fazer:** app Android no papel de recebedor/servidor; outra stack
+     (não é Python puro).
 
 4. **Preparar vídeo MP4 — CONTINUA FORA DE ESCOPO (reconfirmado 2026-06-20).**
    - **Caso real:** um `.mp4` de gravador (fragmentado) chega cópia perfeita, mas a
