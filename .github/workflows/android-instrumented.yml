@@ -55,15 +55,15 @@ jobs:
           arch: x86_64
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            set +e
-            ./gradlew connectedDebugAndroidTest --stacktrace
-            code=$?
-            echo "testes terminaram com codigo $code; matando o emulador"
-            # Só o processo REAL do emulador (qemu-system). NÃO usar 'pkill -f emulator':
-            # casa com o processo da própria action/script e mata o shell (exit code null).
-            adb -s emulator-5554 emu kill 2>/dev/null || true
-            pkill -9 -f qemu-system 2>/dev/null || true
+          # A action roda CADA LINHA do script como um sh -c separado (variáveis não
+          # persistem entre linhas). Por isso vai tudo em UMA linha (scalar dobrado >-),
+          # com ';' separando: roda os testes, guarda o código, mata SÓ o qemu-system
+          # (não 'pkill -f emulator', que casa o próprio script) e sai com o código real.
+          script: >-
+            ./gradlew connectedDebugAndroidTest --stacktrace;
+            code=$?;
+            adb -s emulator-5554 emu kill 2>/dev/null || true;
+            pkill -9 -f qemu-system 2>/dev/null || true;
             exit $code
 
       - name: Sobe relatórios instrumentados (se falhar)
