@@ -1,0 +1,17 @@
+# Catálogo de versões — fonte única. Bumpar = editar uma linha aqui.
+# Versões mid-2026 (conferir em Maven Central / developer.android.com ao subir o build).
+[versions]
+agp = "9.2.0"
+kotlin = "2.4.0"
+junit = "4.13.2"
+androidxTestExtJunit = "1.2.1"
+androidxTestRunner = "1.6.2"
+
+[libraries]
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
