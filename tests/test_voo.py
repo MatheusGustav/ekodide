@@ -82,14 +82,16 @@ def test_retoma_de_onde_parou(servidor, tmp_path, monkeypatch):
     origem = tmp_path / "grande.bin"
     origem.write_bytes(bytes(range(10)))
     tamanho = origem.stat().st_size
+    linha = carteiro._Linha(url)
     # "metade chegou": manda os pedaços 0 e 1 na mão; a rede 'cai' antes do 2
     with origem.open("rb") as f:
         for i in range(2):
-            ok, _ = carteiro._postar("grande.bin", f.read(4), url, SEGREDO, i, 3, tamanho)
+            ok, _ = carteiro._postar(linha, "grande.bin", f.read(4), SEGREDO, i, 3, tamanho)
             assert ok
     assert not (base / "grande.bin").exists()  # ainda incompleto
     # o destino já confirma ter 2 pedaços
-    assert carteiro._ja_recebidos("grande.bin", url, SEGREDO, 3, tamanho) == 2
+    assert carteiro._ja_recebidos(linha, "grande.bin", SEGREDO, 3, tamanho) == 2
+    linha.fechar()
     # novo envio: retoma e fecha idêntico
     r = enviar(origem, url, SEGREDO)
     assert r.ok and _sha(base / "grande.bin") == _sha(origem)

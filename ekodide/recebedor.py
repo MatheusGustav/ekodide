@@ -26,6 +26,12 @@ def criar_handler(base: Path, segredo: str) -> type[BaseHTTPRequestHandler]:
     """Fabrica um Handler amarrado a esta pasta e este segredo (sem estado global)."""
 
     class Handler(BaseHTTPRequestHandler):
+        # HTTP/1.1 mantém a conexão viva entre pedaços (keep-alive): o carteiro
+        # reaproveita a mesma porta em vez de reabrir a cada um. Cada resposta já
+        # manda Content-Length, então o cliente sabe onde um corpo acaba e o próximo
+        # começa — requisito pra reusar a conexão sem embolar.
+        protocol_version = "HTTP/1.1"
+
         def do_POST(self) -> None:
             if self.path == "/receber":
                 self._receber()
