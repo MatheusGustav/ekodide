@@ -1,6 +1,9 @@
 package com.ekodide.android
 
+import android.Manifest
 import android.app.Activity
+import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
@@ -8,57 +11,63 @@ import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ekodide.android.core.Frase
-import com.ekodide.android.net.Vizinhanca
 import com.ekodide.android.server.Recebedor
-import com.ekodide.android.server.ServidorHttp
-import java.io.File
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Collections
 
 /**
- * Pontezinha testável (antes da Etapa 4): ao abrir o app, LIGA o servidor passivo
- * (ServidorHttp) e o anúncio na rede (Vizinhanca), mostra o IP/porta e a frase-código
- * (o segredo) pra digitar no PC. Sem foreground service ainda — roda enquanto a tela
- * está aberta; ficar de pé com a tela apagada/no boot é a Etapa 4. Serve só pra você
- * testar PC↔celular de verdade (empurrar e puxar) a partir deste APK.
+ * Tela do app: sobe o ServidorService (foreground, segundo plano de verdade) e mostra o
+ * endereço (IP:porta) + a frase-código (o segredo) pra digitar no PC. A partir da Etapa 4
+ * o servidor NÃO vive mais na Activity — vive no serviço, que sobrevive à tela apagada e
+ * (próximas tarefas) ao boot. Aqui é só o painel.
  */
 class MainActivity : Activity() {
-
-    /**
-     * Servidor/anúncio de PROCESSO (singleton): sobem UMA vez e seguem vivos enquanto o
-     * app existe. Recriar a Activity (rotação, reabrir) reaproveita — sem rebindar a porta
-     * (era a causa do EADDRINUSE). Parar de verdade só com o app/processo encerrando.
-     */
-    private object Servico {
-        var servidor: ServidorHttp? = null
-        var anuncio: Vizinhanca.Parada? = null
-        var status: String = "ligando…"
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Segredo estável entre aberturas: gera a frase uma vez e guarda.
-        val prefs = getSharedPreferences("ekodide", MODE_PRIVATE)
+        // Garante a frase já aqui (pra mostrar na hora); o serviço lê a mesma pref.
+        val prefs = getSharedPreferences("ekodide", Context.MODE_PRIVATE)
         val frase = prefs.getString("frase", null) ?: Frase.gerar().also {
             prefs.edit().putString("frase", it).apply()
         }
-        val nome = (Build.MODEL ?: "celular").replace(" ", "-").lowercase()
 
-        // Pastas: o que CHEGA cai em 'recebidos'; 'compartilhado' é o que o PC pode PUXAR.
-        // (O seletor de pasta de verdade, via SAF, é a Etapa 5.)
-        val raiz = getExternalFilesDir(null) ?: filesDir
-        val recebidos = File(raiz, "recebidos").apply { mkdirs() }
-        val compartilhado = File(raiz, "compartilhado").apply { mkdirs() }
-        File(compartilhado, "ola-do-celular.txt").let {
-            if (!it.exists()) it.writeText("Oi do Ekodide no celular! 🦜\n")
+        // Notificação é obrigatória pro foreground service aparecer (Android 13+ pede ok).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
 
+        // Sobe o serviço passivo (idempotente: se já está rodando, não duplica).
+        ServidorService.iniciar(this)
+
+        val ip = ipLocal()
+        val texto = """
+            Ekodide 🦜
+
+            Servidor rodando em 2º plano ✅
+            (segue de pé com a tela apagada)
+
+            Aparelho:  ${(Build.MODEL ?: "celular")}
+            Endereço:  http://$ip:${Recebedor.PORTA}
+
+            Frase (o segredo) — digite IGUAL no PC:
+
+                $frase
+
+            Recebidos e pasta compartilhada ficam em
+            Android/data/com.ekodide.android/files/.
+
+            Pode fechar esta tela: o serviço continua.
+            Subir no boot e isenção de bateria vêm a seguir.
+        """.trimIndent()
+
         val tv = TextView(this).apply {
-            text = "Ekodide 🦜\n\nLigando o servidor…"
+            text = texto
             textSize = 15f
-            setTextIsSelectable(true) // pra copiar a frase
+            setTextIsSelectable(true)
             movementMethod = ScrollingMovementMethod()
         }
         val layout = LinearLayout(this).apply {
@@ -68,50 +77,7 @@ class MainActivity : Activity() {
             addView(tv)
         }
         setContentView(layout)
-
-        // Bind do ServerSocket fora da thread principal (evita NetworkOnMainThreadException).
-        Thread {
-            // Liga só se ainda não está rodando neste processo (não rebinda a porta).
-            if (Servico.servidor == null) {
-                Servico.status = try {
-                    val s = ServidorHttp(recebidos, frase, compartilhar = compartilhado)
-                    s.iniciar()
-                    Servico.servidor = s
-                    Servico.anuncio = Vizinhanca.anunciarEmThread(
-                        nome, Recebedor.PORTA, enderecos = listOf(Vizinhanca.BROADCAST),
-                    )
-                    "Servidor LIGADO ✅"
-                } catch (e: Exception) {
-                    "Falhou ao ligar: ${e.message}"
-                }
-            }
-            val status = Servico.status
-            val ip = ipLocal()
-            val texto = """
-                Ekodide 🦜
-
-                $status
-
-                Aparelho:  $nome
-                Endereço:  http://$ip:${Recebedor.PORTA}
-
-                Frase (o segredo) — digite IGUAL no PC:
-
-                    $frase
-
-                Recebidos →  ${recebidos.absolutePath}
-                Compartilhado (dá pra puxar) →  ${compartilhado.name}/  (tem 1 arquivo de teste)
-
-                Deixe esta tela aberta. Rodar de tela apagada
-                e no boot vem na próxima etapa.
-            """.trimIndent()
-            runOnUiThread { tv.text = texto }
-        }.also { it.isDaemon = true }.start()
     }
-
-    // Sem onDestroy derrubando o servidor: ele é de processo e deve sobreviver à recriação
-    // da Activity (rotação/reabrir). Encerrar de fato só com o processo — e o passivo de
-    // verdade (tela apagada/boot) é a Etapa 4 (foreground service).
 
     /** Primeiro IPv4 de LAN (site-local) de uma interface ativa — o endereço do Wi-Fi. */
     private fun ipLocal(): String {

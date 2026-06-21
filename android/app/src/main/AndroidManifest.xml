@@ -37,8 +37,14 @@
             </intent-filter>
         </activity>
 
-        <!-- O servidor (ServidorService, tipo connectedDevice) e o BootReceiver
-             entram na Etapa do servidor/segundo plano. -->
+        <!-- Servidor passivo de longa duração. connectedDevice: sem teto de 6h, pode
+             subir no boot. exported=false: ninguém de fora aciona o serviço. -->
+        <service
+            android:name=".ServidorService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- BootReceiver (subir no boot) entra na próxima tarefa da Etapa 4. -->
 
     </application>
 </manifest>
