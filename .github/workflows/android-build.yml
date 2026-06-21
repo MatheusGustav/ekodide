@@ -49,6 +49,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Build do APK release (assinado, pra distribuir)
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Sobe o APK release
+        uses: actions/upload-artifact@v4
+        with:
+          name: ekodide-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Sobe relatórios de teste (se falhar)
         if: always()
         uses: actions/upload-artifact@v4

@@ -33,6 +33,10 @@ android {
 
     buildTypes {
         release {
+            // Assina a release com a MESMA chave fixa do debug: pra SIDELOAD (não Play),
+            // mantém o CI reproduzível sem segredos e deixa atualizar por cima do que já
+            // está instalado. release = debuggable=false (não é o APK de teste).
+            signingConfig = signingConfigs.getByName("debug")
             // Sem ofuscação por ora (a cifra usa javax.crypto, sem reflexão frágil).
             isMinifyEnabled = false
             proguardFiles(
