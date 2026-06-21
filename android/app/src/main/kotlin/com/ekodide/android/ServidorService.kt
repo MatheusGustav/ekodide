@@ -43,12 +43,35 @@ class ServidorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (servidor == null) ligar()
+        when {
+            // Pasta mudou: derruba e religa só o servidor pra reler a fonte (sem mexer
+            // nos locks/notificação que já estão de pé).
+            intent?.action == ACAO_RECONFIGURAR -> reiniciarServidor()
+            servidor == null -> ligar()
+        }
         // START_STICKY: se o sistema matar, recria o serviço quando puder.
         return START_STICKY
     }
 
     private fun ligar() {
+        // Locks: manter o Wi-Fi acordado (tela apagada) e poder receber broadcast.
+        val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        if (wifiLock == null) {
+            wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ekodide:wifi").apply {
+                setReferenceCounted(false); acquire()
+            }
+        }
+        if (multicastLock == null) {
+            multicastLock = wm.createMulticastLock("ekodide:multicast").apply {
+                setReferenceCounted(false); acquire()
+            }
+        }
+        subirForeground()
+        ligarServidor()
+    }
+
+    /** (re)cria o servidor + anúncio, relendo a frase e a fonte compartilhada das prefs. */
+    private fun ligarServidor() {
         val prefs = getSharedPreferences("ekodide", Context.MODE_PRIVATE)
         val frase = prefs.getString("frase", null) ?: Frase.gerar().also {
             prefs.edit().putString("frase", it).apply()
@@ -70,17 +93,6 @@ class ServidorService : Service() {
             FonteArquivo(compartilhado)
         }
 
-        // Locks: manter o Wi-Fi acordado (tela apagada) e poder receber broadcast.
-        val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ekodide:wifi").apply {
-            setReferenceCounted(false); acquire()
-        }
-        multicastLock = wm.createMulticastLock("ekodide:multicast").apply {
-            setReferenceCounted(false); acquire()
-        }
-
-        subirForeground()
-
         // Bind do ServerSocket fora da thread principal.
         Thread {
             try {
@@ -94,6 +106,12 @@ class ServidorService : Service() {
                 // porta ocupada/sem rede: o START_STICKY tenta de novo
             }
         }.also { it.isDaemon = true }.start()
+    }
+
+    private fun reiniciarServidor() {
+        anuncio?.parar(); anuncio = null
+        servidor?.parar(); servidor = null
+        ligarServidor()
     }
 
     private fun subirForeground() {
@@ -127,11 +145,18 @@ class ServidorService : Service() {
 
     companion object {
         private const val NOTIF_ID = 1
+        private const val ACAO_RECONFIGURAR = "com.ekodide.android.RECONFIGURAR"
 
         /** Sobe o serviço em foreground (do app ou do BootReceiver). */
         fun iniciar(ctx: Context) {
-            val i = Intent(ctx, ServidorService::class.java)
-            ctx.startForegroundService(i)
+            ctx.startForegroundService(Intent(ctx, ServidorService::class.java))
+        }
+
+        /** Religa só o servidor pra aplicar uma pasta recém-escolhida (sem reiniciar tudo). */
+        fun reconfigurar(ctx: Context) {
+            ctx.startForegroundService(
+                Intent(ctx, ServidorService::class.java).setAction(ACAO_RECONFIGURAR),
+            )
         }
     }
 }

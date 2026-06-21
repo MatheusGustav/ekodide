@@ -280,6 +280,7 @@ class MainActivity : Activity() {
                 } catch (_: Exception) {
                 }
                 prefs.edit().putString("pasta_uri", uri.toString()).apply()
+                ServidorService.reconfigurar(this) // aplica a nova pasta na hora
                 // re-renderiza a tela atual pra mostrar a pasta escolhida
                 if (prefs.getBoolean("setup_done", false)) mostrarHome() else renderPasso()
             }
