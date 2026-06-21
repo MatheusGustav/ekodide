@@ -2,13 +2,20 @@ package com.ekodide.android
 
 import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.text.method.ScrollingMovementMethod
 import android.view.Gravity
+import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import com.ekodide.android.core.Frase
 import com.ekodide.android.server.Recebedor
@@ -17,66 +24,120 @@ import java.net.NetworkInterface
 import java.util.Collections
 
 /**
- * Tela do app: sobe o ServidorService (foreground, segundo plano de verdade) e mostra o
- * endereço (IP:porta) + a frase-código (o segredo) pra digitar no PC. A partir da Etapa 4
- * o servidor NÃO vive mais na Activity — vive no serviço, que sobrevive à tela apagada e
- * (próximas tarefas) ao boot. Aqui é só o painel.
+ * Painel do app: sobe o ServidorService (segundo plano de verdade) e mostra endereço +
+ * frase. Os botões da Etapa 4.3 ajudam o serviço a SOBREVIVER nos OEMs:
+ *   - Liberar bateria: tira o app do Doze (isenção de otimização de bateria);
+ *   - Autostart: nos OEMs (MIUI/Xiaomi) o app precisa de "iniciar automaticamente"
+ *     liberado na mão — abre a tela certa (com plano B nos ajustes do app).
  */
 class MainActivity : Activity() {
+
+    private lateinit var status: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Garante a frase já aqui (pra mostrar na hora); o serviço lê a mesma pref.
         val prefs = getSharedPreferences("ekodide", Context.MODE_PRIVATE)
         val frase = prefs.getString("frase", null) ?: Frase.gerar().also {
             prefs.edit().putString("frase", it).apply()
         }
 
-        // Notificação é obrigatória pro foreground service aparecer (Android 13+ pede ok).
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
 
-        // Sobe o serviço passivo (idempotente: se já está rodando, não duplica).
         ServidorService.iniciar(this)
 
-        val ip = ipLocal()
-        val texto = """
+        status = TextView(this).apply {
+            textSize = 15f
+            setTextIsSelectable(true)
+            movementMethod = ScrollingMovementMethod()
+        }
+        val btBateria = Button(this).apply {
+            text = "Liberar bateria (não dormir)"
+            setOnClickListener { pedirIsencaoBateria() }
+        }
+        val btAutostart = Button(this).apply {
+            text = "Ligar no início (autostart)"
+            setOnClickListener { abrirAutostart() }
+        }
+
+        val coluna = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(40, 56, 40, 56)
+            addView(status)
+            addView(btBateria)
+            addView(btAutostart)
+        }
+        setContentView(ScrollView(this).apply { addView(coluna) })
+        atualizarStatus(frase)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val frase = getSharedPreferences("ekodide", Context.MODE_PRIVATE).getString("frase", "?")!!
+        atualizarStatus(frase) // reflete a bateria depois que o usuário volta dos ajustes
+    }
+
+    private fun atualizarStatus(frase: String) {
+        val pm = getSystemService(PowerManager::class.java)
+        val isento = pm.isIgnoringBatteryOptimizations(packageName)
+        status.text = """
             Ekodide 🦜
 
             Servidor rodando em 2º plano ✅
-            (segue de pé com a tela apagada)
+            Bateria liberada: ${if (isento) "sim ✅" else "NÃO — toque o botão"}
 
             Aparelho:  ${(Build.MODEL ?: "celular")}
-            Endereço:  http://$ip:${Recebedor.PORTA}
+            Endereço:  http://${ipLocal()}:${Recebedor.PORTA}
 
             Frase (o segredo) — digite IGUAL no PC:
 
                 $frase
 
-            Recebidos e pasta compartilhada ficam em
-            Android/data/com.ekodide.android/files/.
-
-            Pode fechar esta tela: o serviço continua.
-            Subir no boot e isenção de bateria vêm a seguir.
+            Pode fechar a tela: o serviço continua.
+            Nos Xiaomi, ligue também o "autostart".
         """.trimIndent()
+    }
 
-        val tv = TextView(this).apply {
-            text = texto
-            textSize = 15f
-            setTextIsSelectable(true)
-            movementMethod = ScrollingMovementMethod()
+    /** Pede pra tirar o app da otimização de bateria (Doze) — vital pra ficar de pé. */
+    private fun pedirIsencaoBateria() {
+        val pm = getSystemService(PowerManager::class.java)
+        if (pm.isIgnoringBatteryOptimizations(packageName)) return
+        try {
+            startActivity(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")),
+            )
+        } catch (_: Exception) {
+            abrirAjustesDoApp()
         }
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(40, 56, 40, 56)
-            addView(tv)
+    }
+
+    /** Abre a tela de autostart do OEM (MIUI primeiro), com plano B nos ajustes do app. */
+    private fun abrirAutostart() {
+        val miui = Intent().apply {
+            component = ComponentName(
+                "com.miui.securitycenter",
+                "com.miui.permcenter.autostart.AutoStartManagementActivity",
+            )
         }
-        setContentView(layout)
+        try {
+            startActivity(miui)
+        } catch (_: Exception) {
+            abrirAjustesDoApp()
+        }
+    }
+
+    private fun abrirAjustesDoApp() {
+        try {
+            startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")),
+            )
+        } catch (_: Exception) {
+        }
     }
 
     /** Primeiro IPv4 de LAN (site-local) de uma interface ativa — o endereço do Wi-Fi. */
