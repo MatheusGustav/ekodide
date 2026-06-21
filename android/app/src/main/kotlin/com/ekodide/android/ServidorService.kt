@@ -7,11 +7,14 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
 import com.ekodide.android.core.Frase
 import com.ekodide.android.net.Vizinhanca
+import com.ekodide.android.server.FonteArquivo
+import com.ekodide.android.server.FonteCompartilhada
 import com.ekodide.android.server.Recebedor
 import com.ekodide.android.server.ServidorHttp
 import java.io.File
@@ -58,6 +61,15 @@ class ServidorService : Service() {
             if (!it.exists()) it.writeText("Oi do Ekodide no celular! 🦜\n")
         }
 
+        // Fonte do "puxar": a pasta escolhida pelo usuário (SAF) se houver; senão a pasta
+        // interna de demonstração. A leitura SAF é por content:// (FonteSaf).
+        val pastaUri = prefs.getString("pasta_uri", null)
+        val fonte: FonteCompartilhada = if (pastaUri != null) {
+            FonteSaf(applicationContext, Uri.parse(pastaUri))
+        } else {
+            FonteArquivo(compartilhado)
+        }
+
         // Locks: manter o Wi-Fi acordado (tela apagada) e poder receber broadcast.
         val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ekodide:wifi").apply {
@@ -72,7 +84,7 @@ class ServidorService : Service() {
         // Bind do ServerSocket fora da thread principal.
         Thread {
             try {
-                val s = ServidorHttp(recebidos, frase, compartilhar = compartilhado)
+                val s = ServidorHttp(recebidos, frase, compartilhar = fonte)
                 s.iniciar()
                 servidor = s
                 anuncio = Vizinhanca.anunciarEmThread(

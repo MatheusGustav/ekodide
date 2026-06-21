@@ -108,7 +108,7 @@ class RecebedorTest {
         File(compart, "b.txt").writeBytes(byteArrayOf(9))
 
         val corpo = Lacre.empacotar(linkedMapOf<String, Any?>(), secret)
-        val resp = Recebedor.tratar("/listar", corpo, secret, base, compartilhar = compart)
+        val resp = Recebedor.tratar("/listar", corpo, secret, base, compartilhar = FonteArquivo(compart))
         assertEquals(200, resp.status)
 
         @Suppress("UNCHECKED_CAST")
@@ -135,7 +135,7 @@ class RecebedorTest {
         val dados = ByteArray(200) { (it * 3).toByte() }
         File(compart, "arq.bin").writeBytes(dados)
 
-        val resp = Recebedor.tratar("/buscar", corpoBuscar("arq.bin", 0, 1), secret, base, compartilhar = compart)
+        val resp = Recebedor.tratar("/buscar", corpoBuscar("arq.bin", 0, 1), secret, base, compartilhar = FonteArquivo(compart))
         assertEquals(200, resp.status)
 
         val carga = Lacre.desempacotar(resp.corpo, secret)
@@ -158,7 +158,7 @@ class RecebedorTest {
     fun buscar_arquivo_inexistente_da_400() {
         val base = tempBase()
         val compart = tempBase()
-        val resp = Recebedor.tratar("/buscar", corpoBuscar("sumido.txt", 0, 1), secret, base, compartilhar = compart)
+        val resp = Recebedor.tratar("/buscar", corpoBuscar("sumido.txt", 0, 1), secret, base, compartilhar = FonteArquivo(compart))
         assertEquals(400, resp.status)
     }
 }

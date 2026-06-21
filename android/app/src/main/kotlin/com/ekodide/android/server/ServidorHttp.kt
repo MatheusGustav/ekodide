@@ -23,7 +23,7 @@ class ServidorHttp(
     private val segredo: String,
     private val porta: Int = Recebedor.PORTA,
     private val host: String? = null, // null = todas as interfaces (a LAN alcança)
-    private val compartilhar: java.io.File? = null, // pasta exposta pro "puxar"; null = nada
+    private val compartilhar: FonteCompartilhada? = null, // fonte exposta pro "puxar"; null = nada
 ) {
     // Teto do corpo: base64 incha ~33%, ~32 MB ≈ ~24 MB de arquivo real. Maior vai picado.
     private val limiteCorpo = 32 * 1024 * 1024

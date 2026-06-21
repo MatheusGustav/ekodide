@@ -1,6 +1,5 @@
 package com.ekodide.android.server
 
-import com.ekodide.android.core.Acervo
 import com.ekodide.android.core.CaixaPostal
 import com.ekodide.android.core.Cofre
 import com.ekodide.android.core.Lacre
@@ -25,7 +24,7 @@ object Recebedor {
 
     /**
      * Trata uma requisição. `agora` (epoch s) só pra teste fixar o relógio do lacre;
-     * em produção fica null (= relógio atual). `compartilhar` é a pasta que o admin pode
+     * em produção fica null (= relógio atual). `compartilhar` é a fonte que o admin pode
      * PUXAR (rotas /listar e /buscar) — null (padrão) = nada exposto: o "puxar" é opt-in,
      * nada vaza sem o app apontar uma pasta.
      */
@@ -35,7 +34,7 @@ object Recebedor {
         segredo: String,
         base: File,
         agora: Long? = null,
-        compartilhar: File? = null,
+        compartilhar: FonteCompartilhada? = null,
     ): Resposta {
         val carga = try {
             Lacre.desempacotar(corpo, segredo, agora)
@@ -93,8 +92,8 @@ object Recebedor {
      * aparelho não compartilha nada). O lacre já foi exigido em `tratar` — só responde a
      * quem tem o segredo.
      */
-    private fun listar(segredo: String, compartilhar: File?): Resposta {
-        val itens = Acervo.listar(compartilhar).map {
+    private fun listar(segredo: String, compartilhar: FonteCompartilhada?): Resposta {
+        val itens = (compartilhar?.listar() ?: emptyList()).map {
             mapOf("nome" to it.nome, "tamanho" to it.tamanho)
         }
         return selar(mapOf("itens" to itens), segredo)
@@ -105,7 +104,7 @@ object Recebedor {
      * passa só embaralhado, como no /receber. Recusa se nada é compartilhado ou se o nome
      * tentar escapar da pasta.
      */
-    private fun buscar(carga: Map<String, Any?>, segredo: String, compartilhar: File?): Resposta {
+    private fun buscar(carga: Map<String, Any?>, segredo: String, compartilhar: FonteCompartilhada?): Resposta {
         if (compartilhar == null) {
             return texto(403, "este aparelho não compartilha nada (sirva com --compartilhar)")
         }
@@ -113,7 +112,7 @@ object Recebedor {
         val parte = (carga["parte"] as? Long)?.toInt() ?: return texto(400, "pedido inválido: parte")
         val partes = (carga["partes"] as? Long)?.toInt() ?: return texto(400, "pedido inválido: partes")
         val bruto = try {
-            Acervo.lerPedaco(nome, compartilhar, parte, partes)
+            compartilhar.lerPedaco(nome, parte, partes)
         } catch (e: Exception) {
             return texto(400, "pedido inválido: ${e.message}")
         }
