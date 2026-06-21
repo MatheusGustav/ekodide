@@ -66,8 +66,13 @@ Catálogo em `gradle/libs.versions.toml` (bumpar = uma linha).
   (8779, anuncia/procura, espelho do `vizinhanca.py`); `core/Frase` (pareamento por
   frase-código, espelho do `frase.py`). Tudo provado no JVM e no emulador. **Falta o
   MulticastLock pra RECEBER broadcast no Android — vem na Etapa 4.**
-- [ ] **Etapa 4** — foreground service `connectedDevice` (passivo de verdade: tela apagada/boot),
-  WifiLock HIGH_PERF, MulticastLock, BootReceiver, isenção de bateria. **A parte difícil.**
+- [x] **Etapa 4** — passivo de verdade. `ServidorService` (foreground service tipo
+  `connectedDevice`: notificação fixa, WifiLock HIGH_PERF, MulticastLock, START_STICKY);
+  `MainActivity` sobe o serviço + botões de isenção de bateria e autostart (MIUI);
+  `BootReceiver` (BOOT_COMPLETED). **Provado no Xiaomi real (via cabo):** servidor de pé
+  de tela apagada, e volta sozinho após reboot+desbloqueio sem abrir o app. Também:
+  `debug.keystore` fixo commitado (signingConfigs.debug) pra atualizar APK por cima sem
+  desinstalar. Detalhes/gotchas de OEM na memória do projeto.
 - [ ] **Etapa 5** — UI (status/pasta via SAF/frase), ícone, assinar APK pra sideload.
 
 > **Como retomar:** o miolo está em `app/src/main/kotlin/com/ekodide/android/{core,server}`,
