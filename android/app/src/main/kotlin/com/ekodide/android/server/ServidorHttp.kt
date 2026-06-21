@@ -4,6 +4,7 @@ import java.io.BufferedInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import kotlin.concurrent.thread
@@ -35,8 +36,13 @@ class ServidorHttp(
 
     /** Liga o servidor. Faz o bind de forma síncrona (portaReal já vale ao retornar). */
     fun iniciar() {
-        val s = if (host != null) ServerSocket(porta, 50, InetAddress.getByName(host))
-        else ServerSocket(porta)
+        // SO_REUSEADDR antes do bind (espelha allow_reuse_address do recebedor.py): evita
+        // EADDRINUSE quando o socket anterior ainda está em TIME_WAIT (reabrir o app).
+        val s = ServerSocket()
+        s.reuseAddress = true
+        val endereco = if (host != null) InetSocketAddress(InetAddress.getByName(host), porta)
+        else InetSocketAddress(porta)
+        s.bind(endereco, 50)
         server = s
         rodando = true
         thread(isDaemon = true, name = "ekodide-servidor") {

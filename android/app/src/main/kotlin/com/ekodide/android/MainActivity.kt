@@ -25,8 +25,16 @@ import java.util.Collections
  */
 class MainActivity : Activity() {
 
-    private var servidor: ServidorHttp? = null
-    private var anuncio: Vizinhanca.Parada? = null
+    /**
+     * Servidor/anúncio de PROCESSO (singleton): sobem UMA vez e seguem vivos enquanto o
+     * app existe. Recriar a Activity (rotação, reabrir) reaproveita — sem rebindar a porta
+     * (era a causa do EADDRINUSE). Parar de verdade só com o app/processo encerrando.
+     */
+    private object Servico {
+        var servidor: ServidorHttp? = null
+        var anuncio: Vizinhanca.Parada? = null
+        var status: String = "ligando…"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,17 +71,21 @@ class MainActivity : Activity() {
 
         // Bind do ServerSocket fora da thread principal (evita NetworkOnMainThreadException).
         Thread {
-            val status = try {
-                val s = ServidorHttp(recebidos, frase, compartilhar = compartilhado)
-                s.iniciar()
-                servidor = s
-                anuncio = Vizinhanca.anunciarEmThread(
-                    nome, Recebedor.PORTA, enderecos = listOf(Vizinhanca.BROADCAST),
-                )
-                "Servidor LIGADO ✅"
-            } catch (e: Exception) {
-                "Falhou ao ligar: ${e.message}"
+            // Liga só se ainda não está rodando neste processo (não rebinda a porta).
+            if (Servico.servidor == null) {
+                Servico.status = try {
+                    val s = ServidorHttp(recebidos, frase, compartilhar = compartilhado)
+                    s.iniciar()
+                    Servico.servidor = s
+                    Servico.anuncio = Vizinhanca.anunciarEmThread(
+                        nome, Recebedor.PORTA, enderecos = listOf(Vizinhanca.BROADCAST),
+                    )
+                    "Servidor LIGADO ✅"
+                } catch (e: Exception) {
+                    "Falhou ao ligar: ${e.message}"
+                }
             }
+            val status = Servico.status
             val ip = ipLocal()
             val texto = """
                 Ekodide 🦜
@@ -97,11 +109,9 @@ class MainActivity : Activity() {
         }.also { it.isDaemon = true }.start()
     }
 
-    override fun onDestroy() {
-        anuncio?.parar()
-        servidor?.parar()
-        super.onDestroy()
-    }
+    // Sem onDestroy derrubando o servidor: ele é de processo e deve sobreviver à recriação
+    // da Activity (rotação/reabrir). Encerrar de fato só com o processo — e o passivo de
+    // verdade (tela apagada/boot) é a Etapa 4 (foreground service).
 
     /** Primeiro IPv4 de LAN (site-local) de uma interface ativa — o endereço do Wi-Fi. */
     private fun ipLocal(): String {
