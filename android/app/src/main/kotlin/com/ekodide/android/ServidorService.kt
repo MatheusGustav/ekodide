@@ -119,12 +119,12 @@ class ServidorService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(canalId) == null) {
             nm.createNotificationChannel(
-                NotificationChannel(canalId, "Ekodide servidor", NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel(canalId, "Serviço em segundo plano", NotificationManager.IMPORTANCE_LOW),
             )
         }
         val notif: Notification = Notification.Builder(this, canalId)
-            .setContentTitle("Ekodide 🦜 ouvindo")
-            .setContentText("Recebendo e compartilhando na porta ${Recebedor.PORTA}")
+            .setContentTitle("Ekodide ativo")
+            .setContentText("Disponível na rede local para enviar e receber arquivos.")
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setOngoing(true)
             .build()
