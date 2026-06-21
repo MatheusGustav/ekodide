@@ -73,10 +73,11 @@ Catálogo em `gradle/libs.versions.toml` (bumpar = uma linha).
   de tela apagada, e volta sozinho após reboot+desbloqueio sem abrir o app. Também:
   `debug.keystore` fixo commitado (signingConfigs.debug) pra atualizar APK por cima sem
   desinstalar. Detalhes/gotchas de OEM na memória do projeto.
-- [~] **Etapa 5** — ✅ wizard de 1ª execução + home; ✅ leitura da pasta via SAF
+- [x] **Etapa 5** — ✅ wizard de 1ª execução + home; ✅ leitura da pasta via SAF
   (content://, provado no Xiaomi); ✅ ícone próprio (papagaio, adaptativo);
   ✅ identidade visual "sentinela/console cifrado" (paleta do Matheus, design system
-  `ui/Estilo`). **FALTA:** empacotar/assinar um APK de release pra distribuir.
+  `ui/Estilo`); ✅ APK de **release** assinado (chave fixa, sideload) — o CI sobe
+  `ekodide-release-apk`. **App completo (Etapas 0–5).**
 
 > **Como retomar:** o miolo está em `app/src/main/kotlin/com/ekodide/android/{core,server}`,
 > espelhando os módulos Python homônimos em `../ekodide/`. Todo byte-exato é provado por
