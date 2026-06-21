@@ -2,4 +2,11 @@
 <resources>
     <!-- Fundo do ícone adaptativo: o cinza-quase-preto do desenho do papagaio. -->
     <color name="ic_launcher_background">#1E1E1C</color>
+
+    <!-- Paleta Ekodide (sentinela / console cifrado). -->
+    <color name="ek_tinta">#1D1D1C</color>   <!-- fundo (tinta) -->
+    <color name="ek_painel">#444544</color>  <!-- bordas / superfície -->
+    <color name="ek_traco">#6B6D6B</color>   <!-- traços / terciário -->
+    <color name="ek_nevoa">#A29F98</color>   <!-- texto secundário -->
+    <color name="ek_mask">#E6DBC6</color>    <!-- accent (máscara do papagaio) -->
 </resources>

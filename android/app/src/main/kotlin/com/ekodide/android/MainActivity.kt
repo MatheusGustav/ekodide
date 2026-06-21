@@ -2,6 +2,8 @@ package com.ekodide.android
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -11,31 +13,21 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
-import android.text.method.ScrollingMovementMethod
-import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.TextView
+import android.widget.Toast
 import com.ekodide.android.core.Frase
 import com.ekodide.android.server.Recebedor
+import com.ekodide.android.ui.Estilo
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Collections
 
 /**
- * Painel do app + assistente (wizard) de primeira execução.
- *
- * Etapa 5 (LAYOUT primeiro, estilo depois): na 1ª vez, um assistente guia UMA permissão
- * por tela (notificação → bateria → autostart → pasta), pulando sozinho as que já estão
- * ok. Depois disso, abre direto na HOME (status + IP + frase). As telas de permissão NÃO
- * são réplicas falsas: cada botão abre a tela REAL do Android/MIUI (Intent) e o texto diz
- * o que tocar.
- *
- * NOTA: o seletor de pasta aqui só CAPTURA e persiste a escolha (tree uri SAF). Fazer o
- * servidor LER dessa pasta (content:// -> Acervo) é a tarefa seguinte, separada por mexer
- * no core já provado.
+ * Painel do app + assistente (wizard) de 1ª execução, no visual "sentinela / console
+ * cifrado" (ver ui/Estilo). As telas de permissão NÃO são réplicas: cada botão abre a
+ * tela REAL do sistema (Intent); o texto diz o que fazer.
  */
 class MainActivity : Activity() {
 
@@ -48,9 +40,9 @@ class MainActivity : Activity() {
     private data class Passo(
         val titulo: String,
         val texto: String,
-        val rotulo: String?,            // texto do botão de ação (null = sem ação, só seguir)
-        val acao: (() -> Unit)?,        // o que o botão faz (abre a tela real do sistema)
-        val opcional: Boolean,          // mostra [Pular]
+        val rotulo: String?,
+        val acao: (() -> Unit)?,
+        val opcional: Boolean,
         val aoAvancar: (() -> Unit)? = null,
     )
 
@@ -58,6 +50,11 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         frase = prefs.getString("frase", null) ?: Frase.gerar().also {
             prefs.edit().putString("frase", it).apply()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIF)
         }
         ServidorService.iniciar(this)
 
@@ -67,6 +64,14 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (prefs.getBoolean("setup_done", false)) mostrarHome()
+    }
+
+    private fun pintar(coluna: LinearLayout) {
+        setContentView(ScrollView(this).apply {
+            setBackgroundColor(Estilo.TINTA)
+            isFillViewport = true
+            addView(coluna)
+        })
     }
 
     // ---------- Wizard ----------
@@ -80,7 +85,7 @@ class MainActivity : Activity() {
     private fun montarPassos(): List<Passo> {
         val l = mutableListOf<Passo>()
         l += Passo(
-            "Bem-vindo ao Ekodide 🦜",
+            "Bem-vindo ao Ekodide",
             "Este aparelho passa a funcionar como um ponto seguro para enviar e receber " +
                 "arquivos com o seu computador pela rede local — tudo autenticado e cifrado de " +
                 "ponta a ponta. Em poucos passos, ele estará pronto para operar de forma autônoma.",
@@ -130,48 +135,47 @@ class MainActivity : Activity() {
 
     private fun renderPasso() {
         val p = passos[passoAtual]
-        val titulo = TextView(this).apply {
-            text = "Passo ${passoAtual + 1} de ${passos.size}\n\n${p.titulo}"
-            textSize = 20f
-            gravity = Gravity.CENTER
-        }
-        val corpo = TextView(this).apply {
-            text = "\n${p.texto}\n"
-            textSize = 16f
-        }
-        val coluna = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 64, 48, 48)
-            addView(titulo)
-            addView(corpo)
-        }
-        if (p.rotulo != null) {
-            coluna.addView(Button(this).apply {
-                text = p.rotulo
-                setOnClickListener { p.acao?.invoke() }
-            })
-        }
-        // pasta escolhida (feedback no passo de pasta)
+        val ultimo = passoAtual == passos.size - 1
+        val raiz = Estilo.raiz(this)
+
+        raiz.addView(Estilo.header(this, true))
+        raiz.addView(Estilo.espaco(this, 32f))
+
+        val contador = "passo %02d / %02d".format(passoAtual + 1, passos.size)
+        raiz.addView(Estilo.eyebrow(this, contador, Estilo.NEVOA))
+        raiz.addView(Estilo.progresso(this, passoAtual, passos.size).also {
+            Estilo.margem(it, this, topo = 12f)
+        })
+        raiz.addView(Estilo.espaco(this, 28f))
+
+        raiz.addView(Estilo.titulo(this, p.titulo))
+        raiz.addView(Estilo.corpo(this, p.texto).also { Estilo.margem(it, this, topo = 14f) })
+
         if (p.titulo.startsWith("Pasta")) {
-            coluna.addView(TextView(this).apply {
-                text = "\nPasta selecionada: ${pastaEscolhida()}"
-                textSize = 14f
+            raiz.addView(Estilo.dado(this, "pasta selecionada", pastaEscolhida()).also {
+                Estilo.margem(it, this, topo = 20f)
             })
         }
-        val navegacao = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(0, 48, 0, 0)
-            if (p.opcional) addView(Button(context).apply {
-                text = "Pular"; setOnClickListener { avancar() }
-            })
-            addView(Button(context).apply {
-                text = if (passoAtual == passos.size - 1) "Concluir" else "Continuar"
-                setOnClickListener { p.aoAvancar?.invoke(); avancar() }
+
+        raiz.addView(Estilo.espaco(this, 36f))
+
+        // Ação do passo (abre a tela real) = primário; senão o Continuar é o primário.
+        if (p.rotulo != null && p.acao != null) {
+            raiz.addView(Estilo.botaoPrimario(this, p.rotulo, p.acao))
+            raiz.addView(Estilo.botaoFantasma(this, if (ultimo) "Concluir" else "Continuar") {
+                p.aoAvancar?.invoke(); avancar()
+            }.also { Estilo.margem(it, this, topo = 12f) })
+        } else {
+            raiz.addView(Estilo.botaoPrimario(this, if (ultimo) "Concluir" else "Continuar") {
+                p.aoAvancar?.invoke(); avancar()
             })
         }
-        coluna.addView(navegacao)
-        pintar(coluna)
+        if (p.opcional) {
+            raiz.addView(Estilo.botaoTexto(this, "Pular esta etapa") { avancar() }.also {
+                Estilo.margem(it, this, topo = 6f)
+            })
+        }
+        pintar(raiz)
     }
 
     private fun avancar() {
@@ -189,41 +193,43 @@ class MainActivity : Activity() {
     private fun mostrarHome() {
         val pm = getSystemService(PowerManager::class.java)
         val isento = pm.isIgnoringBatteryOptimizations(packageName)
-        val status = TextView(this).apply {
-            textSize = 15f
-            setTextIsSelectable(true)
-            movementMethod = ScrollingMovementMethod()
-            text = """
-                Ekodide 🦜
+        val raiz = Estilo.raiz(this)
 
-                O serviço está ativo em segundo plano.
-                Energia: ${if (isento) "liberada ✅" else "com restrição ⚠️"}
+        raiz.addView(Estilo.header(this, true))
+        raiz.addView(Estilo.espaco(this, 28f))
 
-                Dispositivo:  ${(Build.MODEL ?: "este aparelho")}
-                Endereço:     http://${ipLocal()}:${Recebedor.PORTA}
-                Pasta:        ${pastaEscolhida()}
+        // Selo de pareamento — o herói da tela.
+        raiz.addView(Estilo.selo(this, frase) { copiarFrase() })
+        raiz.addView(Estilo.espaco(this, 16f))
 
-                Frase de pareamento — informe a mesma no computador:
+        raiz.addView(Estilo.dado(this, "endereço na rede", "http://${ipLocal()}:${Recebedor.PORTA}"))
+        raiz.addView(Estilo.espaco(this, 12f))
 
-                    $frase
-
-                Você pode fechar esta tela; o serviço permanece ativo.
-            """.trimIndent()
-        }
-        val coluna = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 64, 48, 48)
-            addView(status)
-            addView(Button(context).apply {
-                text = "Refazer configuração"
-                setOnClickListener { iniciarWizard() }
+        // Pasta + ação de trocar.
+        val cartaoPasta = Estilo.painel(this).apply {
+            addView(Estilo.eyebrow(this@MainActivity, "pasta compartilhada", Estilo.NEVOA))
+            addView(Estilo.valorMono(this@MainActivity, pastaEscolhida()).also {
+                Estilo.margem(it, this@MainActivity, topo = 6f, baixo = 10f)
             })
-            addView(Button(context).apply {
-                text = "Selecionar pasta compartilhada"
-                setOnClickListener { escolherPasta() }
-            })
+            addView(Estilo.botaoTexto(this@MainActivity, "Trocar pasta", Estilo.MASK) { escolherPasta() })
         }
-        pintar(coluna)
+        raiz.addView(cartaoPasta)
+        raiz.addView(Estilo.espaco(this, 12f))
+
+        raiz.addView(Estilo.dado(this, "energia", if (isento) "Liberada" else "Com restrição"))
+        raiz.addView(Estilo.espaco(this, 28f))
+
+        raiz.addView(Estilo.corpo(this, "Pode fechar esta tela — o serviço permanece ativo em segundo plano."))
+        raiz.addView(Estilo.espaco(this, 20f))
+        raiz.addView(Estilo.botaoFantasma(this, "Refazer configuração") { iniciarWizard() })
+
+        pintar(raiz)
+    }
+
+    private fun copiarFrase() {
+        val cb = getSystemService(ClipboardManager::class.java)
+        cb.setPrimaryClip(ClipData.newPlainText("frase Ekodide", frase))
+        Toast.makeText(this, "Frase copiada", Toast.LENGTH_SHORT).show()
     }
 
     // ---------- Ações (abrem telas REAIS do sistema) ----------
@@ -281,23 +287,16 @@ class MainActivity : Activity() {
                 }
                 prefs.edit().putString("pasta_uri", uri.toString()).apply()
                 ServidorService.reconfigurar(this) // aplica a nova pasta na hora
-                // re-renderiza a tela atual pra mostrar a pasta escolhida
                 if (prefs.getBoolean("setup_done", false)) mostrarHome() else renderPasso()
             }
         }
     }
 
-    /** Nome amigável da pasta escolhida (último segmento do tree uri), ou "(nenhuma)". */
+    /** Nome amigável da pasta escolhida (último segmento do tree uri), ou "não definida". */
     private fun pastaEscolhida(): String {
         val s = prefs.getString("pasta_uri", null) ?: return "não definida"
         val dec = Uri.decode(s)
         return dec.substringAfterLast(':', dec.substringAfterLast('/', "selecionada"))
-    }
-
-    // ---------- util ----------
-
-    private fun pintar(view: View) {
-        setContentView(ScrollView(this).apply { addView(view) })
     }
 
     private fun ipLocal(): String {
@@ -312,7 +311,7 @@ class MainActivity : Activity() {
             }
         } catch (_: Exception) {
         }
-        return "??? (conecte no Wi-Fi)"
+        return "sem Wi-Fi"
     }
 
     companion object {

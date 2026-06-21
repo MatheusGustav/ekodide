@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema escuro do Ekodide sobre o framework Material (sem dependência extra). -->
+    <style name="Theme.Ekodide" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ek_tinta</item>
+        <item name="android:statusBarColor">@color/ek_tinta</item>
+        <item name="android:navigationBarColor">@color/ek_tinta</item>
+        <item name="android:colorBackground">@color/ek_tinta</item>
+        <item name="android:textColorPrimary">@color/ek_mask</item>
+        <item name="android:textColorSecondary">@color/ek_nevoa</item>
+        <item name="android:colorAccent">@color/ek_mask</item>
+    </style>
+</resources>
