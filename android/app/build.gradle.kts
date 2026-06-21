@@ -18,6 +18,19 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // Chave de debug FIXA, commitada no repo (credenciais-padrão de debug, públicas).
+        // Sem isto, cada build do CI assina com um keystore novo (runner descartável) e o
+        // APK não atualiza por cima do anterior (INSTALL_FAILED_UPDATE_INCOMPATIBLE). É só
+        // debug/sideload — NÃO serve pra release/Play.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             // Sem ofuscação por ora (a cifra usa javax.crypto, sem reflexão frágil).
