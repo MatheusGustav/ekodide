@@ -81,16 +81,20 @@ class MainActivity : Activity() {
         val l = mutableListOf<Passo>()
         l += Passo(
             "Bem-vindo ao Ekodide 🦜",
-            "Seu celular vira um cofre que recebe e compartilha arquivos com o PC pela rede " +
-                "local — lacrado e cifrado. Vamos liberar umas coisinhas pra ele ficar de pé sozinho.",
+            "Este aparelho passa a funcionar como um ponto seguro para enviar e receber " +
+                "arquivos com o seu computador pela rede local — tudo autenticado e cifrado de " +
+                "ponta a ponta. Em poucos passos, ele estará pronto para operar de forma autônoma.",
             null, null, false,
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             l += Passo(
-                "Notificação", "O Ekodide mantém um aviso fixo enquanto está ouvindo. Toque em permitir.",
-                "Permitir notificação",
+                "Notificações",
+                "Enquanto estiver ativo, o Ekodide mantém um aviso permanente na barra de " +
+                    "notificações — é ele que permite o funcionamento contínuo em segundo plano. " +
+                    "Conceda a permissão para prosseguir.",
+                "Permitir notificações",
                 { requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIF) },
                 true,
             )
@@ -98,24 +102,28 @@ class MainActivity : Activity() {
         val pm = getSystemService(PowerManager::class.java)
         if (!pm.isIgnoringBatteryOptimizations(packageName)) {
             l += Passo(
-                "Bateria", "Pra ele não dormir, abra os ajustes e escolha \"Sem restrição\".",
-                "Abrir ajustes de bateria", { pedirIsencaoBateria() }, true,
+                "Energia",
+                "Para que o aplicativo permaneça disponível mesmo com a tela desligada, abra as " +
+                    "configurações de energia e defina o consumo como “Sem restrição”.",
+                "Abrir configurações de energia", { pedirIsencaoBateria() }, true,
             )
         }
         if (!prefs.getBoolean("autostart_done", false)) {
             l += Passo(
-                "Iniciar sozinho (Xiaomi)",
-                "Nos Xiaomi, ligue o \"autostart\" pro app voltar depois de reiniciar. " +
-                    "Faça isso e toque em Avançar.",
-                "Abrir autostart", { abrirAutostart() }, true,
+                "Inicialização automática",
+                "Para que o Ekodide volte a funcionar sozinho depois que o aparelho for " +
+                    "reiniciado, habilite a inicialização automática do aplicativo nas " +
+                    "configurações do seu dispositivo. Ative a opção e toque em Continuar.",
+                "Abrir configurações", { abrirAutostart() }, true,
                 aoAvancar = { prefs.edit().putBoolean("autostart_done", true).apply() },
             )
         }
         l += Passo(
             "Pasta compartilhada",
-            "Escolha a pasta que o PC pode puxar (rolo da câmera, Downloads…). " +
-                "Pode pular e definir depois. (A leitura dessa pasta entra na próxima versão.)",
-            "Escolher pasta", { escolherPasta() }, true,
+            "Escolha a pasta que ficará acessível ao computador — por exemplo, a galeria de " +
+                "imagens ou a pasta de downloads. Esta etapa é opcional e pode ser ajustada a " +
+                "qualquer momento.",
+            "Selecionar pasta", { escolherPasta() }, true,
         )
         return l
     }
@@ -146,7 +154,7 @@ class MainActivity : Activity() {
         // pasta escolhida (feedback no passo de pasta)
         if (p.titulo.startsWith("Pasta")) {
             coluna.addView(TextView(this).apply {
-                text = "\nEscolhida: ${pastaEscolhida()}"
+                text = "\nPasta selecionada: ${pastaEscolhida()}"
                 textSize = 14f
             })
         }
@@ -158,7 +166,7 @@ class MainActivity : Activity() {
                 text = "Pular"; setOnClickListener { avancar() }
             })
             addView(Button(context).apply {
-                text = if (passoAtual == passos.size - 1) "Concluir" else "Avançar"
+                text = if (passoAtual == passos.size - 1) "Concluir" else "Continuar"
                 setOnClickListener { p.aoAvancar?.invoke(); avancar() }
             })
         }
@@ -188,18 +196,18 @@ class MainActivity : Activity() {
             text = """
                 Ekodide 🦜
 
-                Servidor rodando em 2º plano ✅
-                Bateria liberada: ${if (isento) "sim ✅" else "NÃO ⚠️"}
+                O serviço está ativo em segundo plano.
+                Energia: ${if (isento) "liberada ✅" else "com restrição ⚠️"}
 
-                Aparelho:  ${(Build.MODEL ?: "celular")}
-                Endereço:  http://${ipLocal()}:${Recebedor.PORTA}
-                Pasta:     ${pastaEscolhida()}
+                Dispositivo:  ${(Build.MODEL ?: "este aparelho")}
+                Endereço:     http://${ipLocal()}:${Recebedor.PORTA}
+                Pasta:        ${pastaEscolhida()}
 
-                Frase (o segredo) — digite IGUAL no PC:
+                Frase de pareamento — informe a mesma no computador:
 
                     $frase
 
-                Pode fechar a tela: o serviço continua.
+                Você pode fechar esta tela; o serviço permanece ativo.
             """.trimIndent()
         }
         val coluna = LinearLayout(this).apply {
@@ -207,11 +215,11 @@ class MainActivity : Activity() {
             setPadding(48, 64, 48, 48)
             addView(status)
             addView(Button(context).apply {
-                text = "Refazer ajustes"
+                text = "Refazer configuração"
                 setOnClickListener { iniciarWizard() }
             })
             addView(Button(context).apply {
-                text = "Escolher pasta compartilhada"
+                text = "Selecionar pasta compartilhada"
                 setOnClickListener { escolherPasta() }
             })
         }
@@ -280,9 +288,9 @@ class MainActivity : Activity() {
 
     /** Nome amigável da pasta escolhida (último segmento do tree uri), ou "(nenhuma)". */
     private fun pastaEscolhida(): String {
-        val s = prefs.getString("pasta_uri", null) ?: return "(nenhuma)"
+        val s = prefs.getString("pasta_uri", null) ?: return "não definida"
         val dec = Uri.decode(s)
-        return dec.substringAfterLast(':', dec.substringAfterLast('/', "(escolhida)"))
+        return dec.substringAfterLast(':', dec.substringAfterLast('/', "selecionada"))
     }
 
     // ---------- util ----------
