@@ -1,7 +1,8 @@
 # Ekodide 🦜
 
-Envia e recebe arquivos pela rede, **lacrados** (HMAC) e **idênticos** — sem
-dependências (só a biblioteca padrão do Python).
+Envia e recebe arquivos pela rede, **lacrados** (HMAC) e **cifrados** (AES-256-GCM),
+chegando **byte-idênticos**. Quase tudo é biblioteca padrão do Python — a única
+dependência é a `cryptography` (a cifra).
 
 O nome é de um papagaio africano (*odídẹ*): **repete com perfeição** (o arquivo
 chega cópia exata, sha256 idêntico) e **voa** (vai de um aparelho a outro pela
@@ -11,14 +12,16 @@ maquinário fixo.
 
 ## Instalar
 
-Precisa só de **Python** (é zero-dependência, então `pipx` é opcional):
+Precisa de **Python** (a única dependência, a `cryptography`, instala junto):
 
 ```bash
-# direto do GitHub, isolado e no PATH (recomendado):
-pipx install git+https://github.com/MatheusGustav/ekodide.git
+# do PyPI, isolado e no PATH (recomendado):
+pipx install ekodide
+# ou sem pipx (cai em ~/.local/bin):
+pip install --user ekodide
 
-# sem pipx — pip basta (cai em ~/.local/bin):
-pip install --user git+https://github.com/MatheusGustav/ekodide.git
+# versão de desenvolvimento, direto do GitHub:
+pipx install git+https://github.com/MatheusGustav/ekodide.git
 
 # pra desenvolver localmente:
 git clone https://github.com/MatheusGustav/ekodide.git
@@ -189,8 +192,11 @@ servir(Path("~/Downloads").expanduser(), segredo="...", host="0.0.0.0")
 
 ## Android
 
-Em breve via **app nativo** (o celular como ponta passiva que o PC comanda).
-Em desenvolvimento.
+Tem **app nativo** (Kotlin) que põe o celular como **ponta passiva** — recebe e deixa
+o PC puxar, falando o mesmo protocolo no fio (lacre + cofre, byte-idêntico). Roda em
+**segundo plano** (volta no boot), com **seletor de pasta** (SAF) e **pareamento por
+frase**. O código, o roadmap e como compilar/instalar estão em
+[`android/`](android/README.md) — o APK sai como artefato a cada build no GitHub Actions.
 
 ## Como é por dentro
 
