@@ -44,7 +44,16 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
-        <!-- BootReceiver (subir no boot) entra na próxima tarefa da Etapa 4. -->
+        <!-- Sobe o serviço no boot. exported=true: o broadcast vem do sistema.
+             Nos OEMs (MIUI) só chega com "autostart" liberado. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>
