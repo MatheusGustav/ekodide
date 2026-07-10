@@ -26,7 +26,8 @@ object Recebedor {
      * Trata uma requisição. `agora` (epoch s) só pra teste fixar o relógio do lacre;
      * em produção fica null (= relógio atual). `compartilhar` é a fonte que o admin pode
      * PUXAR (rotas /listar e /buscar) — null (padrão) = nada exposto: o "puxar" é opt-in,
-     * nada vaza sem o app apontar uma pasta.
+     * nada vaza sem o app apontar uma pasta. `aberto` é a navegação por pastas (campo
+     * `pasta` no /listar e /buscar) — null = pedido com `pasta` é recusado (403).
      */
     fun tratar(
         rota: String,
@@ -35,6 +36,7 @@ object Recebedor {
         base: File,
         agora: Long? = null,
         compartilhar: FonteCompartilhada? = null,
+        aberto: FonteAberta? = null,
     ): Resposta {
         val carga = try {
             Lacre.desempacotar(corpo, segredo, agora)
@@ -44,8 +46,8 @@ object Recebedor {
         return when (rota) {
             "/receber" -> receber(carga, segredo, base)
             "/progresso" -> progresso(carga, segredo, base)
-            "/listar" -> listar(segredo, compartilhar)
-            "/buscar" -> buscar(carga, segredo, compartilhar)
+            "/listar" -> listar(carga, segredo, compartilhar, aberto)
+            "/buscar" -> buscar(carga, segredo, compartilhar, aberto)
             else -> texto(404, "rota desconhecida")
         }
     }
@@ -88,11 +90,33 @@ object Recebedor {
     }
 
     /**
-     * Diz o que dá pra PUXAR daqui: a lista da pasta compartilhada (vazia se este
-     * aparelho não compartilha nada). O lacre já foi exigido em `tratar` — só responde a
-     * quem tem o segredo.
+     * Diz o que dá pra PUXAR daqui. Sem `pasta` na carga: a lista (recursiva) da pasta
+     * compartilhada, como sempre. Com `pasta`: a vista RASA daquela pasta via [FonteAberta]
+     * (itens + subpastas) — recusada se a navegação não está liberada. O lacre já foi
+     * exigido em `tratar` — só responde a quem tem o segredo.
      */
-    private fun listar(segredo: String, compartilhar: FonteCompartilhada?): Resposta {
+    private fun listar(
+        carga: Map<String, Any?>,
+        segredo: String,
+        compartilhar: FonteCompartilhada?,
+        aberto: FonteAberta?,
+    ): Resposta {
+        val pasta = carga["pasta"] as? String
+        if (pasta != null) {
+            if (aberto == null) return texto(403, SEM_NAVEGACAO)
+            val vista = try {
+                aberto.listar(pasta)
+            } catch (e: Exception) {
+                return texto(400, "pedido inválido: ${e.message}")
+            }
+            return selar(
+                mapOf(
+                    "itens" to vista.itens.map { mapOf("nome" to it.nome, "tamanho" to it.tamanho) },
+                    "pastas" to vista.pastas,
+                ),
+                segredo,
+            )
+        }
         val itens = (compartilhar?.listar() ?: emptyList()).map {
             mapOf("nome" to it.nome, "tamanho" to it.tamanho)
         }
@@ -104,15 +128,23 @@ object Recebedor {
      * passa só embaralhado, como no /receber. Recusa se nada é compartilhado ou se o nome
      * tentar escapar da pasta.
      */
-    private fun buscar(carga: Map<String, Any?>, segredo: String, compartilhar: FonteCompartilhada?): Resposta {
-        if (compartilhar == null) {
+    private fun buscar(
+        carga: Map<String, Any?>,
+        segredo: String,
+        compartilhar: FonteCompartilhada?,
+        aberto: FonteAberta?,
+    ): Resposta {
+        val pasta = carga["pasta"] as? String
+        if (pasta == null && compartilhar == null) {
             return texto(403, "este aparelho não compartilha nada (sirva com --compartilhar)")
         }
+        if (pasta != null && aberto == null) return texto(403, SEM_NAVEGACAO)
         val nome = carga["nome"] as? String ?: return texto(400, "pedido inválido: nome")
         val parte = (carga["parte"] as? Long)?.toInt() ?: return texto(400, "pedido inválido: parte")
         val partes = (carga["partes"] as? Long)?.toInt() ?: return texto(400, "pedido inválido: partes")
         val bruto = try {
-            compartilhar.lerPedaco(nome, parte, partes)
+            if (pasta != null) aberto!!.lerPedaco(pasta, nome, parte, partes)
+            else compartilhar!!.lerPedaco(nome, parte, partes)
         } catch (e: Exception) {
             return texto(400, "pedido inválido: ${e.message}")
         }
@@ -128,6 +160,9 @@ object Recebedor {
             segredo,
         )
     }
+
+    private const val SEM_NAVEGACAO =
+        "esta ponta não navega por pastas (no celular, conceda 'Acesso a todos os arquivos' no app)"
 
     private fun selar(dados: Map<String, Any?>, segredo: String): Resposta =
         Resposta(200, Lacre.empacotar(dados, segredo))

@@ -144,6 +144,20 @@ def test_arquivo_inexistente(origem_servida):
     assert not ok and "disponível" in info
 
 
+def test_navegar_e_recusado_por_ponta_que_nao_navega(origem_servida):
+    """O servidor do PC não navega por pastas (isso é do celular com acesso total):
+    a recusa tem que ser EXPLÍCITA (403 com motivo), nunca a pasta errada calada."""
+    url, compartilhada, destino = origem_servida
+    (compartilhada / "a.txt").write_bytes(b"oi")
+    with pytest.raises(buscador.ErroPuxar, match="não navega"):
+        buscador.navegar(url, SEGREDO, "DCIM/Camera")
+    # o pull com --pasta cai na mesma recusa, com o motivo na resposta
+    ok, info = buscador.puxar("a.txt", url, SEGREDO, destino, pasta="DCIM/Camera")
+    assert not ok and "não navega" in info
+    ok, info = buscador.puxar("a.txt", url, SEGREDO, destino, tamanho=2, pasta="DCIM/Camera")
+    assert not ok and "não navega" in info
+
+
 def test_servidor_sem_compartilhar_recusa_buscar(tmp_path):
     """Sem --compartilhar, listar vem vazio e buscar é recusado (puxar desligado)."""
     srv = ThreadingHTTPServer(("127.0.0.1", 0), criar_handler(tmp_path.resolve(), SEGREDO))

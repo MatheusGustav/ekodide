@@ -140,7 +140,8 @@ def _cmd_pull(args) -> int:
         return 1
     cfg = config.carregar()
     destino_dir = args.dir or (cfg.get("receber") or {}).get("dir") or "~/Downloads"
-    ok, info = puxar(args.arquivo, url, segredo, Path(destino_dir).expanduser())
+    ok, info = puxar(args.arquivo, url, segredo, Path(destino_dir).expanduser(),
+                     pasta=args.pasta)
     if ok:
         print(f"Puxei '{args.arquivo}' de '{args.de}'. Salvo em: {info}")
     else:
@@ -149,7 +150,7 @@ def _cmd_pull(args) -> int:
 
 
 def _cmd_list(args) -> int:
-    from .buscador import ErroPuxar, listar
+    from .buscador import ErroPuxar, listar, navegar
 
     try:
         url = _resolver_destino(args.de, args.descobrir)
@@ -157,6 +158,28 @@ def _cmd_list(args) -> int:
     except config.ErroConfig as erro:
         print(erro, file=sys.stderr)
         return 1
+
+    if args.pasta is not None:
+        # Navegação por pastas: vista RASA (um nível, como um 'ls' remoto).
+        try:
+            vista = navegar(url, segredo, args.pasta)
+        except ErroPuxar as erro:
+            print(f"Não consegui navegar em '{args.de}': {erro}", file=sys.stderr)
+            return 1
+        rotulo = args.pasta or "(raiz)"
+        if not vista["pastas"] and not vista["itens"]:
+            print(f"'{rotulo}' está vazia em '{args.de}'.")
+            return 0
+        print(f"Em '{args.de}', pasta '{rotulo}':")
+        for p in vista["pastas"]:
+            base = f"{args.pasta}/{p}" if args.pasta else p
+            print(f"      pasta  {p}/   (desça com: --pasta \"{base}\")")
+        for it in vista["itens"]:
+            print(f"  {_tam_humano(it['tamanho']):>9}  {it['nome']}")
+        if vista["itens"]:
+            print(f"\nPuxe com:  ekodide pull <arquivo> --de {args.de} --pasta \"{args.pasta}\"")
+        return 0
+
     try:
         itens = listar(url, segredo)
     except ErroPuxar as erro:
@@ -415,12 +438,14 @@ def construir_parser() -> argparse.ArgumentParser:
     pl.add_argument("arquivo", help="nome do arquivo (como aparece no 'ekodide list')")
     pl.add_argument("--de", required=True, help="aparelho de onde puxar (ex.: pc, celular)")
     pl.add_argument("--dir", help="onde salvar (padrão: config ou ~/Downloads)")
+    pl.add_argument("--pasta", help="pasta da origem de onde puxar (navegação; ex.: DCIM/Camera)")
     pl.add_argument("--descobrir", action="store_true",
                     help="acha a origem pela rede (ignora o IP da config)")
     pl.set_defaults(func=_cmd_pull)
 
     li = sub.add_parser("list", help="lista o que outro aparelho compartilha pra puxar")
     li.add_argument("--de", required=True, help="aparelho a consultar (ex.: pc, celular)")
+    li.add_argument("--pasta", help="navega numa pasta da origem (ex.: DCIM/Screenshots; '' = raiz)")
     li.add_argument("--descobrir", action="store_true",
                     help="acha a origem pela rede (ignora o IP da config)")
     li.set_defaults(func=_cmd_list)

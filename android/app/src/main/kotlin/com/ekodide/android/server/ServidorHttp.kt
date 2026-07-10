@@ -24,6 +24,7 @@ class ServidorHttp(
     private val porta: Int = Recebedor.PORTA,
     private val host: String? = null, // null = todas as interfaces (a LAN alcança)
     private val compartilhar: FonteCompartilhada? = null, // fonte exposta pro "puxar"; null = nada
+    private val aberto: FonteAberta? = null, // navegação por pastas; null = pedido com `pasta` é 403
 ) {
     // Teto do corpo: base64 incha ~33%, ~32 MB ≈ ~24 MB de arquivo real. Maior vai picado.
     private val limiteCorpo = 32 * 1024 * 1024
@@ -77,7 +78,9 @@ class ServidorHttp(
                 }
                 val corpo = ByteArray(cab.contentLength)
                 if (!lerExato(input, corpo)) break // conexão caiu no meio do corpo
-                val resp = Recebedor.tratar(cab.rota, corpo, segredo, base, compartilhar = compartilhar)
+                val resp = Recebedor.tratar(
+                    cab.rota, corpo, segredo, base, compartilhar = compartilhar, aberto = aberto,
+                )
                 escrever(output, resp, fechar = cab.fechar)
                 if (cab.fechar) break
             }

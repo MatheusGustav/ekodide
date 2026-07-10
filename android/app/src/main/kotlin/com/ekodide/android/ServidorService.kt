@@ -10,9 +10,11 @@ import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.Environment
 import android.os.IBinder
 import com.ekodide.android.core.Frase
 import com.ekodide.android.net.Vizinhanca
+import com.ekodide.android.server.FonteAberta
 import com.ekodide.android.server.FonteArquivo
 import com.ekodide.android.server.FonteCompartilhada
 import com.ekodide.android.server.Recebedor
@@ -93,10 +95,20 @@ class ServidorService : Service() {
             FonteArquivo(compartilhado)
         }
 
+        // Navegação por pastas: só existe se o dono concedeu "acesso a todos os
+        // arquivos" (API 30+). Sem a permissão, pedido com `pasta` leva 403 — o
+        // servidor nunca finge um poder que o sistema não deu.
+        val aberto: FonteAberta? =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) {
+                FonteAberta(Environment.getExternalStorageDirectory())
+            } else {
+                null
+            }
+
         // Bind do ServerSocket fora da thread principal.
         Thread {
             try {
-                val s = ServidorHttp(recebidos, frase, compartilhar = fonte)
+                val s = ServidorHttp(recebidos, frase, compartilhar = fonte, aberto = aberto)
                 s.iniciar()
                 servidor = s
                 anuncio = Vizinhanca.anunciarEmThread(

@@ -20,6 +20,10 @@
     <!-- Isenção de bateria (passa a rede pelo Doze). Restrita na Play, mas OK por ser
          APK sideload — instalação direta não passa pela revisão da loja. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Navegação por pastas (o PC pede qualquer pasta no /listar//buscar). Restrita na
+         Play, mas OK por ser APK sideload. Concedida na tela do sistema (wizard leva lá);
+         sem ela, pedido com `pasta` responde 403 — nada muda no resto. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <!-- Câmera SÓ pro scanner de QR do pareamento; pedida em runtime na hora de usar.
          required=false: sem câmera o app instala igual — digitar o código resolve. -->

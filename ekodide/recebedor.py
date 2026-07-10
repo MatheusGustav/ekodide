@@ -109,8 +109,14 @@ def criar_handler(
 
         def _listar(self) -> None:
             """Diz o que dá pra PUXAR daqui: a lista da pasta compartilhada (vazia se
-            este aparelho não compartilha nada). Só responde a quem tem o segredo."""
-            if self._ler_carga() is None:  # exige o lacre, mesmo sem usar a carga
+            este aparelho não compartilha nada). Só responde a quem tem o segredo.
+            O campo `pasta` (navegação por pastas) é coisa do CELULAR com acesso total —
+            este servidor recusa explícito em vez de responder a pasta errada calado."""
+            carga = self._ler_carga()  # exige o lacre, mesmo sem usar a carga
+            if carga is None:
+                return
+            if carga.get("pasta") is not None:
+                self._texto(403, "esta ponta não navega por pastas (só a pasta --compartilhar)")
                 return
             self._selar({"itens": acervo.listar(compartilhar)})
 
@@ -119,6 +125,9 @@ def criar_handler(
             Recusa se nada é compartilhado ou se o nome tentar escapar da pasta."""
             carga = self._ler_carga()
             if carga is None:
+                return
+            if carga.get("pasta") is not None:
+                self._texto(403, "esta ponta não navega por pastas (só a pasta --compartilhar)")
                 return
             if compartilhar is None:
                 self._texto(403, "este aparelho não compartilha nada (sirva com --compartilhar)")

@@ -30,31 +30,53 @@ class ErroPuxar(Exception):
     """Falha ao puxar (origem fora do ar, recusada, ou resposta fora da tranca)."""
 
 
-def listar(url: str, segredo: str) -> list[dict]:
-    """O que dá pra puxar da `url`: lista de {'nome', 'tamanho'}. Levanta ErroPuxar
-    se a origem recusar ou a resposta não abrir o lacre."""
+def _consultar_listar(url: str, segredo: str, carga: dict) -> dict:
+    """Posta a `carga` na /listar e devolve a resposta aberta (lacre conferido)."""
     linha = _Linha(url)
     try:
         try:
-            status, bruto = linha.postar("/listar", empacotar({}, segredo))
+            status, bruto = linha.postar("/listar", empacotar(carga, segredo))
         except (http.client.HTTPException, OSError) as erro:
             raise ErroPuxar(f"não alcancei a origem ({erro})")
         if status != 200:
             raise ErroPuxar(f"origem recusou listar ({status}): {bruto.decode('utf-8', 'replace')}")
         try:
-            itens = desempacotar(bruto, segredo).get("itens", [])
+            return desempacotar(bruto, segredo)
         except (TrancaInvalida, binascii.Error) as erro:
             raise ErroPuxar(f"lista fora da tranca: {erro}")
-        return itens if isinstance(itens, list) else []
     finally:
         linha.fechar()
 
 
+def listar(url: str, segredo: str) -> list[dict]:
+    """O que dá pra puxar da `url`: lista de {'nome', 'tamanho'}. Levanta ErroPuxar
+    se a origem recusar ou a resposta não abrir o lacre."""
+    itens = _consultar_listar(url, segredo, {}).get("itens", [])
+    return itens if isinstance(itens, list) else []
+
+
+def navegar(url: str, segredo: str, pasta: str) -> dict:
+    """A vista RASA de uma `pasta` da origem (navegação por pastas): devolve
+    {'itens': [{'nome','tamanho'}...], 'pastas': ['sub', ...]} — um nível, como um 'ls'.
+    Só funciona se a origem liberou a navegação (o celular com acesso total);
+    origem que não navega recusa com o motivo (ErroPuxar)."""
+    volta = _consultar_listar(url, segredo, {"pasta": pasta})
+    itens = volta.get("itens", [])
+    pastas = volta.get("pastas", [])
+    return {
+        "itens": itens if isinstance(itens, list) else [],
+        "pastas": pastas if isinstance(pastas, list) else [],
+    }
+
+
 def _pedir_pedaco(
-    linha: _Linha, nome: str, parte: int, partes: int, segredo: str
+    linha: _Linha, nome: str, parte: int, partes: int, segredo: str,
+    pasta: str | None = None,
 ) -> tuple[bool, bytes | str]:
     """Pede UM pedaço pela /buscar e devolve (ok, bytes-decifrados) ou (False, motivo)."""
     carga = {"nome": nome, "parte": parte, "partes": partes}
+    if pasta is not None:
+        carga["pasta"] = pasta
     try:
         status, bruto = linha.postar("/buscar", empacotar(carga, segredo))
     except (http.client.HTTPException, OSError) as erro:
@@ -112,17 +134,21 @@ def espiar(
 
 
 def puxar(
-    nome: str, url: str, segredo: str, base: Path, tamanho: int | None = None
+    nome: str, url: str, segredo: str, base: Path, tamanho: int | None = None,
+    pasta: str | None = None,
 ) -> tuple[bool, str]:
     """Puxa o arquivo `nome` da `url` pra dentro de `base` (lacrado/cifrado no caminho).
     Arquivo grande vem PICADO e é remontado pela caixa postal. Se um download anterior
     caiu no meio, RETOMA de onde parou (pula os pedaços que já estão no `.parcial` local).
-    Se `tamanho` não vier, descobre via /listar. Devolve (ok, destino-ou-motivo)."""
+    Se `tamanho` não vier, descobre via /listar. Com `pasta`, puxa da pasta navegada
+    (origem precisa liberar a navegação). Devolve (ok, destino-ou-motivo)."""
     if tamanho is None:
         try:
-            disponivel = {i["nome"]: i["tamanho"] for i in listar(url, segredo)}
+            itens = navegar(url, segredo, pasta)["itens"] if pasta is not None \
+                else listar(url, segredo)
         except ErroPuxar as erro:
             return False, str(erro)
+        disponivel = {i["nome"]: i["tamanho"] for i in itens}
         if nome not in disponivel:
             return False, f"'{nome}' não está disponível pra puxar nessa origem"
         tamanho = int(disponivel[nome])
@@ -136,7 +162,7 @@ def puxar(
     destino = None
     try:
         for parte in range(ja, partes):
-            ok, payload = _pedir_pedaco(linha, nome, parte, partes, segredo)
+            ok, payload = _pedir_pedaco(linha, nome, parte, partes, segredo, pasta)
             if not ok:
                 return False, f"pedaço {parte + 1}/{partes}: {payload} (rode o pull de novo pra retomar)"
             # grava reusando a caixa postal: mesma cerca + remontagem do empurrar.

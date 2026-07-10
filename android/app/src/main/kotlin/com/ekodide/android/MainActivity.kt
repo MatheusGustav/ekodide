@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
@@ -65,6 +66,13 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // O "acesso a todos os arquivos" é concedido FORA do app (tela do sistema);
+        // ao voltar, se mudou, religa o servidor pra ganhar/perder a navegação na hora.
+        val aberto = acessoTotal()
+        if (aberto != prefs.getBoolean("acesso_total", false)) {
+            prefs.edit().putBoolean("acesso_total", aberto).apply()
+            ServidorService.reconfigurar(this)
+        }
         if (prefs.getBoolean("setup_done", false)) mostrarHome()
     }
 
@@ -123,6 +131,15 @@ class MainActivity : Activity() {
                     "configurações do seu dispositivo. Ative a opção e toque em Continuar.",
                 "Abrir configurações", { abrirAutostart() }, true,
                 aoAvancar = { prefs.edit().putBoolean("autostart_done", true).apply() },
+            )
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !acessoTotal()) {
+            l += Passo(
+                "Acesso aos arquivos",
+                "Com o acesso a todos os arquivos, o computador pode navegar pelas pastas " +
+                    "do aparelho — fotos, capturas de tela, downloads — sem que você precise " +
+                    "escolher uma pasta a cada vez. Conceda a permissão e volte ao aplicativo.",
+                "Conceder acesso", { pedirAcessoTotal() }, true,
             )
         }
         l += Passo(
@@ -222,6 +239,22 @@ class MainActivity : Activity() {
         raiz.addView(Estilo.espaco(this, 12f))
 
         raiz.addView(Estilo.dado(this, "energia", if (isento) "Liberada" else "Com restrição"))
+        raiz.addView(Estilo.espaco(this, 12f))
+
+        // Navegação por pastas (o PC escolhe a pasta ao puxar) — estado + atalho.
+        val cartaoAcesso = Estilo.painel(this).apply {
+            addView(Estilo.eyebrow(this@MainActivity, "navegação por pastas", Estilo.NEVOA))
+            addView(
+                Estilo.valorMono(
+                    this@MainActivity,
+                    if (acessoTotal()) "Liberada (acesso a todos os arquivos)" else "Desligada",
+                ).also { Estilo.margem(it, this@MainActivity, topo = 6f, baixo = 10f) },
+            )
+            if (!acessoTotal() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                addView(Estilo.botaoTexto(this@MainActivity, "Conceder acesso", Estilo.MASK) { pedirAcessoTotal() })
+            }
+        }
+        raiz.addView(cartaoAcesso)
         raiz.addView(Estilo.espaco(this, 28f))
 
         raiz.addView(Estilo.corpo(this, "Pode fechar esta tela — o serviço permanece ativo em segundo plano."))
@@ -426,6 +459,28 @@ class MainActivity : Activity() {
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")),
             )
         } catch (_: Exception) {
+        }
+    }
+
+    /** Concedido o "acesso a todos os arquivos"? (a chave da navegação por pastas) */
+    private fun acessoTotal(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
+
+    private fun pedirAcessoTotal() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    Uri.parse("package:$packageName"),
+                ),
+            )
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            } catch (_: Exception) {
+                abrirAjustesDoApp()
+            }
         }
     }
 

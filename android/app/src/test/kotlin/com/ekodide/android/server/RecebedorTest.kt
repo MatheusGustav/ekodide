@@ -161,4 +161,76 @@ class RecebedorTest {
         val resp = Recebedor.tratar("/buscar", corpoBuscar("sumido.txt", 0, 1), secret, base, compartilhar = FonteArquivo(compart))
         assertEquals(400, resp.status)
     }
+
+    // ---------- navegação por pastas (campo `pasta` + FonteAberta) ----------
+
+    /** Uma raiz de armazenamento de mentira, com uma foto em DCIM/Camera. */
+    private fun raizNavegavel(): File {
+        val raiz = tempBase()
+        File(raiz, "DCIM/Camera").mkdirs()
+        File(raiz, "DCIM/Camera/foto.jpg").writeBytes(byteArrayOf(4, 5, 6))
+        return raiz
+    }
+
+    @Test
+    fun listar_com_pasta_devolve_vista_rasa() {
+        val base = tempBase()
+        val raiz = raizNavegavel()
+        val corpo = Lacre.empacotar(linkedMapOf<String, Any?>("pasta" to "DCIM"), secret)
+        val resp = Recebedor.tratar("/listar", corpo, secret, base, aberto = FonteAberta(raiz))
+        assertEquals(200, resp.status)
+        val carga = Lacre.desempacotar(resp.corpo, secret)
+        @Suppress("UNCHECKED_CAST")
+        assertEquals(listOf("Camera"), carga["pastas"] as List<String>)
+        @Suppress("UNCHECKED_CAST")
+        assertTrue((carga["itens"] as List<*>).isEmpty())
+    }
+
+    @Test
+    fun listar_com_pasta_sem_navegacao_da_403() {
+        val base = tempBase()
+        val corpo = Lacre.empacotar(linkedMapOf<String, Any?>("pasta" to "DCIM"), secret)
+        val resp = Recebedor.tratar("/listar", corpo, secret, base) // sem `aberto`
+        assertEquals(403, resp.status)
+    }
+
+    @Test
+    fun listar_com_pasta_invalida_da_400() {
+        val base = tempBase()
+        val corpo = Lacre.empacotar(linkedMapOf<String, Any?>("pasta" to "Nao/Existe"), secret)
+        val resp = Recebedor.tratar("/listar", corpo, secret, base, aberto = FonteAberta(raizNavegavel()))
+        assertEquals(400, resp.status)
+    }
+
+    @Test
+    fun buscar_com_pasta_entrega_o_arquivo_da_pasta_pedida() {
+        val base = tempBase()
+        val raiz = raizNavegavel()
+        val corpo = Lacre.empacotar(
+            linkedMapOf<String, Any?>(
+                "nome" to "foto.jpg", "parte" to 0, "partes" to 1, "pasta" to "DCIM/Camera",
+            ),
+            secret,
+        )
+        // sem `compartilhar` de propósito: a navegação não depende da pasta SAF
+        val resp = Recebedor.tratar("/buscar", corpo, secret, base, aberto = FonteAberta(raiz))
+        assertEquals(200, resp.status)
+        val carga = Lacre.desempacotar(resp.corpo, secret)
+        val aberto = Cofre.decifrar(Base64.getDecoder().decode(carga["conteudo"] as String), secret)
+        assertArrayEquals(byteArrayOf(4, 5, 6), aberto)
+    }
+
+    @Test
+    fun buscar_com_pasta_sem_navegacao_da_403() {
+        val base = tempBase()
+        val corpo = Lacre.empacotar(
+            linkedMapOf<String, Any?>(
+                "nome" to "foto.jpg", "parte" to 0, "partes" to 1, "pasta" to "DCIM/Camera",
+            ),
+            secret,
+        )
+        // mesmo com uma pasta SAF compartilhada, `pasta` exige a navegação liberada
+        val resp = Recebedor.tratar("/buscar", corpo, secret, base, compartilhar = FonteArquivo(tempBase()))
+        assertEquals(403, resp.status)
+    }
 }
