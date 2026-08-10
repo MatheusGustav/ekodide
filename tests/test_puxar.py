@@ -156,3 +156,81 @@ def test_servidor_sem_compartilhar_recusa_buscar(tmp_path):
         assert not ok
     finally:
         srv.shutdown()
+
+
+# --- espiar: a mesma viagem, sem deixar cópia (olhar ≠ puxar) ----------------
+
+def test_espia_o_conteudo_sem_gravar_nada(origem_servida):
+    url, compartilhada, destino = origem_servida
+    (compartilhada / "nota.txt").write_bytes("anotação com acento".encode())
+    ok, carga, tamanho = buscador.espiar("nota.txt", url, SEGREDO)
+    assert ok
+    assert carga == "anotação com acento".encode()
+    assert tamanho == len(carga)
+    # o ponto da espiada: NADA encostou no disco de quem olhou
+    assert list(destino.iterdir()) == []
+
+
+def test_espia_binario_sem_estragar(origem_servida):
+    url, compartilhada, _ = origem_servida
+    cru = bytes(range(256))
+    (compartilhada / "b.bin").write_bytes(cru)
+    ok, carga, _ = buscador.espiar("b.bin", url, SEGREDO)
+    assert ok and carga == cru
+
+
+def test_espia_de_subpasta(origem_servida):
+    url, compartilhada, _ = origem_servida
+    (compartilhada / "Docs").mkdir()
+    (compartilhada / "Docs" / "leia.txt").write_bytes(b"conteudo")
+    ok, carga, _ = buscador.espiar("Docs/leia.txt", url, SEGREDO)
+    assert ok and carga == b"conteudo"
+
+
+def test_espiada_grande_e_remontada_na_memoria(origem_servida, monkeypatch):
+    url, compartilhada, destino = origem_servida
+    monkeypatch.setattr(acervo, "PEDACO", 4)  # 10 bytes -> 3 pedaços
+    (compartilhada / "grande.bin").write_bytes(bytes(range(10)))
+    ok, carga, tamanho = buscador.espiar("grande.bin", url, SEGREDO)
+    assert ok and carga == bytes(range(10)) and tamanho == 10
+    assert list(destino.iterdir()) == []
+
+
+def test_limite_apara_e_o_resto_nem_viaja(origem_servida, monkeypatch):
+    """Espiar não é ler o livro inteiro: com limite, para de pedir pedaço assim
+    que junta o bastante — o resto do arquivo nem sai da outra ponta."""
+    url, compartilhada, _ = origem_servida
+    monkeypatch.setattr(acervo, "PEDACO", 4)  # 20 bytes -> 5 pedaços
+    (compartilhada / "grande.bin").write_bytes(bytes(range(20)))
+
+    pedidos = []
+    original = acervo.ler_pedaco
+
+    def _contar(nome, base, parte, partes):
+        pedidos.append(parte)
+        return original(nome, base, parte, partes)
+
+    monkeypatch.setattr(acervo, "ler_pedaco", _contar)
+    ok, carga, tamanho = buscador.espiar("grande.bin", url, SEGREDO, limite=6)
+    assert ok
+    assert carga == bytes(range(6))   # aparado no limite
+    assert tamanho == 20              # mas o tamanho REAL vem junto: dá pra saber que cortou
+    assert len(pedidos) == 2          # 2 pedaços de 4 bastaram; os outros 3 não viajaram
+
+
+def test_espiar_arquivo_inexistente(origem_servida):
+    url, _, _ = origem_servida
+    ok, motivo, tamanho = buscador.espiar("nao-existe.txt", url, SEGREDO)
+    assert not ok and "disponível" in motivo and tamanho == 0
+
+
+def test_espiar_com_segredo_errado_nao_abre(origem_servida):
+    url, compartilhada, _ = origem_servida
+    (compartilhada / "a.txt").write_bytes(b"oi")
+    ok, motivo, _ = buscador.espiar("a.txt", url, "chave-errada")
+    assert not ok and isinstance(motivo, str)
+
+
+def test_espiar_origem_fora_do_ar(tmp_path):
+    ok, motivo, tamanho = buscador.espiar("a.txt", "http://127.0.0.1:1", SEGREDO)
+    assert not ok and "alcancei" in motivo and tamanho == 0

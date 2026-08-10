@@ -16,7 +16,7 @@ Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do
 | `ekodide/carteiro.py` | ENVIA arquivo/pasta; grande vai **picado**; **retoma** de onde parou + **keep-alive** (conexão reusada); devolve `EnvioResultado` neutro |
 | `ekodide/caixa_postal.py` | grava cercado (sem travessia/sobrescrita) e remonta pedaços (anota progresso no `.parcial.meta`) — pura, recebe a pasta `base` |
 | `ekodide/acervo.py` | LÊ cercado a pasta COMPARTILHADA pro "puxar" (sem `../`, sem fuga por symlink) — espelho de leitura do caixa_postal; pura |
-| `ekodide/buscador.py` | PUXA arquivo de outra ponta (`/listar` + `/buscar`); decifra e grava reusando a caixa postal — espelho do carteiro |
+| `ekodide/buscador.py` | PUXA arquivo de outra ponta (`/listar` + `/buscar`); decifra e grava reusando a caixa postal — espelho do carteiro. Tem também o `espiar`: mesma viagem, mas os bytes ficam SÓ na memória (olhar ≠ puxar), com `limite` pra não trazer o arquivo inteiro |
 | `ekodide/recebedor.py` | servidor HTTP leve (HTTP/1.1) que escuta, decifra e grava; rota `/progresso` pra retomada; `/listar` + `/buscar` expõem a pasta compartilhada (puxar) |
 | `ekodide/vizinhanca.py` | descoberta na LAN (UDP broadcast 8779): anuncia presença / acha aparelhos pelo nome — IP vem do remetente, resolve DHCP |
 | `ekodide/frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band; a frase É o segredo) |
@@ -55,7 +55,7 @@ roda `send`. Uso completo no [README](README.md).
 
 ```bash
 pipx install git+https://github.com/MatheusGustav/ekodide.git   # ou pip install --user ...
-pytest -q   # 79 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada), puxar, config, cli, etc.
+pytest -q   # 88 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada), puxar/espiar, config, cli, etc.
 ```
 
 ## TODO / próximos passos (atualizado 2026-06-20)

@@ -5,6 +5,10 @@ O carteiro EMPURRA (posta na /receber do outro). O buscador PUXA: pergunta o que
 volta CIFRADO (cofre) e lacrado (HMAC); aqui a gente abre o lacre, decifra, e grava
 local reusando a caixa postal (mesma cerca de escrita, mesma remontagem de pedaços).
 
+Além do `puxar` (que grava) existe o `espiar`: a mesma viagem, mas os bytes ficam
+SÓ NA MEMÓRIA e são devolvidos na mão de quem chamou — olhar ≠ puxar. Nenhum dos
+dois mexe no protocolo: as rotas são as mesmas, a outra ponta não muda.
+
 Não lê variáveis de ambiente: recebe a URL e o segredo prontos, como o carteiro.
 """
 from __future__ import annotations
@@ -63,6 +67,48 @@ def _pedir_pedaco(
         return True, decifrar(cifrado, segredo)
     except (TrancaInvalida, KeyError, binascii.Error, InvalidTag) as erro:
         return False, f"pedaço fora da tranca: {erro}"
+
+
+def espiar(
+    nome: str, url: str, segredo: str, limite: int | None = None
+) -> tuple[bool, bytes | str, int]:
+    """ESPIA o arquivo `nome` da `url`: a MESMA viagem do puxar (lacre + cifra,
+    pedaço a pedaço), mas NADA é gravado em disco — os bytes voltam na mão de quem
+    chamou e morrem com ele. Olhar e puxar são atos diferentes: quem só quer ler
+    não devia precisar deixar cópia.
+
+    Com `limite`, para de pedir pedaços assim que junta `limite` bytes e apara o
+    excesso — uma espiada não precisa do arquivo inteiro, e o resto nem viaja.
+
+    Devolve (ok, bytes-ou-motivo, tamanho-total-do-arquivo): comparar o len() dos
+    bytes com o tamanho diz se a espiada foi cortada.
+
+    Não mexe no protocolo: usa as mesmas rotas /listar e /buscar do puxar, então
+    a outra ponta (inclusive o APK) não precisa saber que isto existe."""
+    try:
+        disponivel = {i["nome"]: i["tamanho"] for i in listar(url, segredo)}
+    except ErroPuxar as erro:
+        return False, str(erro), 0
+    if nome not in disponivel:
+        return False, f"'{nome}' não está disponível pra puxar nessa origem", 0
+    tamanho = int(disponivel[nome])
+
+    partes = max(1, (tamanho + acervo.PEDACO - 1) // acervo.PEDACO)
+    juntado = bytearray()
+    linha = _Linha(url)
+    try:
+        for parte in range(partes):
+            ok, payload = _pedir_pedaco(linha, nome, parte, partes, segredo)
+            if not ok:
+                return False, f"pedaço {parte + 1}/{partes}: {payload}", tamanho
+            juntado += payload
+            if limite is not None and len(juntado) >= limite:
+                break  # já deu pra espiada — o resto do arquivo nem viaja
+    finally:
+        linha.fechar()
+    if limite is not None:
+        del juntado[limite:]
+    return True, bytes(juntado), tamanho
 
 
 def puxar(

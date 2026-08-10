@@ -17,7 +17,7 @@ Como comando (depois de instalar):
 """
 from __future__ import annotations
 
-from .buscador import ErroPuxar, puxar
+from .buscador import ErroPuxar, espiar, puxar
 from .buscador import listar as listar_remoto
 from .caixa_postal import gravar_recebido, guardar, guardar_pedaco
 from .carteiro import EnvioResultado, enviar
@@ -38,6 +38,7 @@ __all__ = [
     "enviar",
     "EnvioResultado",
     "puxar",
+    "espiar",
     "listar_remoto",
     "ErroPuxar",
     "servir",
