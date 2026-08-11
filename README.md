@@ -26,6 +26,9 @@ pipx install git+https://github.com/MatheusGustav/ekodide.git
 # pra desenvolver localmente:
 git clone https://github.com/MatheusGustav/ekodide.git
 pip install -e ekodide
+
+# com a tomada MCP (pra plugar num agente de IA — ver mais abaixo):
+pipx install 'ekodide[agente]'
 ```
 
 ## A ideia central: sempre há 2 pontas
@@ -149,6 +152,43 @@ ekodide config destino pc http://IP:8778     # cadastrar/atualizar um destino
 ekodide config segredo "a-chave"             # trocar o segredo
 ```
 A config fica em `~/.config/ekodide/config.json` (cadeado `600`, porque tem o segredo).
+
+### `mcp` — a tomada pra agentes de IA 🔌
+
+O Ekodide continua burro e determinístico — o que este comando faz é dar a ele um
+**encaixe de formato padrão** ([MCP](https://modelcontextprotocol.io)), pra que
+qualquer agente de IA que fale esse padrão o enxergue **sem ninguém escrever
+adaptador**. Antes: cada agente traduzia as funções pro dialeto dele. Agora o
+Ekodide se apresenta sozinho.
+
+```bash
+pipx install 'ekodide[agente]'   # o SDK do MCP é extra OPCIONAL
+ekodide mcp                      # sobe a tomada (conversa por stdin/stdout)
+```
+
+O agente passa a enxergar cinco ferramentas:
+
+| ferramenta | o que faz |
+|---|---|
+| `aparelhos` | quem tem Ekodide nesta rede, e com que apelido |
+| `listar_arquivos` | o que o outro aparelho está compartilhando pra puxar |
+| `espiar_arquivo` | **lê** um texto do outro aparelho — na memória, sem gravar nada |
+| `puxar_arquivo` | **baixa** um arquivo pra este computador (grava em disco) |
+| `enviar_arquivo` | manda um arquivo ou pasta daqui pro outro aparelho |
+
+A configuração no cliente MCP é o comando de sempre — por exemplo:
+
+```json
+{ "mcpServers": { "ekodide": { "command": "ekodide", "args": ["mcp"] } } }
+```
+
+> ⚠️ **Isto é poder na mão de quem decide sozinho.** A tomada não dá ao agente
+> nada além do que o `ekodide send`/`pull` já fazem — mas quem pluga está deixando
+> um agente mandar arquivos deste computador pra outro aparelho e trazer de lá.
+> Plugue em agente que você controla.
+
+Sem o extra instalado o comando recusa com a receita, em vez de estourar — e o
+resto do Ekodide funciona igual, sem carregar o SDK junto.
 
 ## Receitas
 

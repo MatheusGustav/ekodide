@@ -2,7 +2,8 @@
 
 Peça **solta** que envia e recebe arquivos pela rede, **lacrados** (HMAC) e **cifrados**
 (AES-256-GCM), chegando **byte-idênticos**. Quase tudo é biblioteca padrão do Python —
-a única dependência é a `cryptography` (a cifra). Determinística — sem IA dentro; algo
+a única dependência dura é a `cryptography` (a cifra); o SDK do MCP é extra opcional
+(`ekodide[agente]`, a tomada). Determinística — sem IA dentro; algo
 *aciona* (humano, script, agente), o trabalho é do maquinário fixo.
 
 Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do projeto Orogbô)
@@ -22,7 +23,8 @@ Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do
 | `ekodide/frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band; a frase É o segredo) |
 | `ekodide/cortina.py` | detecta o firewall (firewalld/ufw) e monta/roda o comando pra liberar as portas (lado que recebe) |
 | `ekodide/config.py` | `~/.config/ekodide/config.json` (segredo + destinos + nome, cadeado 600) |
-| `ekodide/cli.py` | comando `ekodide` (`send` / `serve` / `list` / `pull` / `devices` / `pair` / `firewall` / `config`) |
+| `ekodide/cli.py` | comando `ekodide` (`send` / `serve` / `list` / `pull` / `devices` / `pair` / `firewall` / `config` / `mcp`) |
+| `ekodide/tomada.py` | a TOMADA MCP: expõe 5 ferramentas (enviar/listar/puxar/espiar/aparelhos) pra qualquer agente de IA. Casca fina sobre as peças de sempre; **extra opcional** (`ekodide[agente]`) |
 
 Modelo mental: **2 pontas** — quem RECEBE roda `serve` (caixa aberta), quem ENVIA
 roda `send`. Uso completo no [README](README.md).
@@ -44,6 +46,15 @@ roda `send`. Uso completo no [README](README.md).
 - Segurança é **código determinístico** (lacre + cofre), não confiada a modelo.
 - **Byte-idêntico é sagrado.** Nada no caminho padrão do `send` pode mudar os bytes
   entregues (é por isso que "preparar vídeo" fica fora — ver TODO #4).
+- **A tomada MCP é ENCAIXE, não cérebro** (decidido 2026-08-10 pelo Matheus Gustav).
+  O Ekodide vira ferramenta plugável em qualquer agente de IA — mas continua sem IA
+  dentro: `tomada.py` só resolve destino/segredo pela config, chama a peça de sempre
+  e traduz o resultado neutro numa frase. Duas travas: **nada de `print`** (no stdio
+  o stdout É o canal do protocolo — recado pra humano vai em stderr) e **ferramenta
+  não estoura** (toda falha vira texto de volta; agente não trata traceback). O SDK
+  do MCP entra como **extra opcional** (`ekodide[agente]`) pra não pesar em quem só
+  quer mandar arquivo. Ele fala a API 2.0 (`mcp.server.MCPServer`) — a `fastmcp` da
+  1.x não existe mais nesse caminho.
 - **Puxar arquivo (em construção, 2026-06-20).** O admin pode PUXAR de outra ponta
   (rotas `/listar` + `/buscar` no recebedor; cliente `buscador.py`; leitura cercada em
   `acervo.py`). Exposição é **opt-in**: `serve --compartilhar <pasta>`, DESLIGADO por
@@ -55,7 +66,8 @@ roda `send`. Uso completo no [README](README.md).
 
 ```bash
 pipx install ekodide   # do PyPI; a pasta local em modo editável: pip install -e .
-pytest -q   # 88 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada), puxar/espiar, config, cli, etc.
+pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada), puxar/espiar, config, cli, tomada, etc.
+            # os da tomada PULAM sozinhos sem o extra: pip install -e '.[agente]'
 ```
 
 ## TODO / próximos passos (atualizado 2026-06-20)
@@ -63,9 +75,10 @@ pytest -q   # 88 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada)
 1. **Publicar no PyPI.** ✅ **FEITO.** `pip install ekodide` / `pipx install ekodide`
    funcionam, sem URL nenhuma. Publicado é publish pra fora → **confirmar com o Matheus
    antes** de todo `twine upload` novo.
-   - **Versões no ar:** `0.1.0` (21/06/2026, a primeira usável) e `0.1.1` (11/08/2026,
-     que somou o `espiar` — ver `buscador.py`). Quem depende do `espiar` precisa pedir
-     `ekodide>=0.1.1`: a `0.1.0` não tem.
+   - **Versões no ar:** `0.1.0` (21/06/2026, a primeira usável), `0.1.1` (11/08/2026,
+     que somou o `espiar` — ver `buscador.py`) e `0.2.0` (11/08/2026, a tomada MCP).
+     Quem depende do `espiar` pede `ekodide>=0.1.1`; quem quer a tomada instala o
+     extra: `ekodide[agente]>=0.2`.
    - **Credencial:** o token fica em `~/.pypirc` (`[pypi]`, `username = __token__`),
      nunca no repo. O `twine upload` o pega sozinho, sem pedir login.
    - **Antes de subir, rebuildar do zero** (`rm -rf build dist ekodide.egg-info`): dist

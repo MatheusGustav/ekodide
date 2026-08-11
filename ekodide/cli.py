@@ -321,6 +321,28 @@ def _cmd_config(args) -> int:
     return 0
 
 
+def _cmd_mcp(args) -> int:
+    """Sobe a tomada MCP. O `mcp` é extra OPCIONAL: sem ele, recusa com a receita
+    em vez de estourar — quem só manda arquivo não precisa carregar essa mala."""
+    try:
+        from .tomada import servir
+    except ImportError:
+        print(
+            "Pra ligar o Ekodide num agente de IA falta o extra do MCP.\n"
+            "Instale com:  pipx install 'ekodide[agente]'   "
+            "(ou pip install 'ekodide[agente]')",
+            file=sys.stderr,
+        )
+        return 1
+    # Daqui pra frente o stdout é do PROTOCOLO — nada de print.
+    print("Tomada MCP de pé (stdio). Ctrl+C encerra.", file=sys.stderr)
+    try:
+        servir()
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
 def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ekodide", description="Enviar/receber arquivos lacrados pela rede.")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -366,6 +388,10 @@ def construir_parser() -> argparse.ArgumentParser:
     fw = sub.add_parser("firewall", help="checa/libera as portas do Ekodide (no lado que recebe)")
     fw.add_argument("--abrir", action="store_true", help="roda o comando pra liberar (pede sudo)")
     fw.set_defaults(func=_cmd_firewall)
+
+    sub.add_parser(
+        "mcp", help="sobe a tomada MCP: liga o Ekodide num agente de IA"
+    ).set_defaults(func=_cmd_mcp)
 
     c = sub.add_parser("config", help="mexe na config (segredo, destinos, nome)")
     csub = c.add_subparsers(dest="acao", required=True)
