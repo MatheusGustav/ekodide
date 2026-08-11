@@ -54,32 +54,37 @@ roda `send`. Uso completo no [README](README.md).
 ## Como rodar / testar
 
 ```bash
-pipx install git+https://github.com/MatheusGustav/ekodide.git   # ou pip install --user ...
+pipx install ekodide   # do PyPI; a pasta local em modo editável: pip install -e .
 pytest -q   # 88 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada), puxar/espiar, config, cli, etc.
 ```
 
 ## TODO / próximos passos (atualizado 2026-06-20)
 
-1. **Publicar no PyPI.** Hoje instala via GitHub (`pipx install git+https://...`).
-   Publicar deixa virar `pipx install ekodide` / `pip install ekodide`, sem URL, e
-   discoverable. É publish pra fora → **confirmar com o Matheus antes** do `twine upload`.
-   - **Versão:** a `0.1.0` atual é a **primeira versão usável** e **nunca foi publicada**
-     — então sai como `0.1.0` mesmo (não precisa bumpar; só se bate no PyPI já existindo).
-   - **ATENÇÃO — o empacotamento de 2026-06-18 ficou DEFASADO.** De lá pra cá o código
-     mudou muito (cifra, retomada, keep-alive) e ganhou **dependência** (`cryptography`).
-     O `dist/` antigo foi apagado. **Tem que rebuildar do zero** antes de subir.
-   - Nome **"ekodide"** estava livre no PyPI em 2026-06-18 (404). **Reconferir** antes.
-   - `pyproject.toml` já tem `classifiers`, `keywords`, `[project.urls]` e a
-     `dependencies = ["cryptography>=42"]`.
-   - **Rebuildar e publicar** (build/twine NÃO estão no sistema; venv descartável):
+1. **Publicar no PyPI.** ✅ **FEITO.** `pip install ekodide` / `pipx install ekodide`
+   funcionam, sem URL nenhuma. Publicado é publish pra fora → **confirmar com o Matheus
+   antes** de todo `twine upload` novo.
+   - **Versões no ar:** `0.1.0` (21/06/2026, a primeira usável) e `0.1.1` (11/08/2026,
+     que somou o `espiar` — ver `buscador.py`). Quem depende do `espiar` precisa pedir
+     `ekodide>=0.1.1`: a `0.1.0` não tem.
+   - **Credencial:** o token fica em `~/.pypirc` (`[pypi]`, `username = __token__`),
+     nunca no repo. O `twine upload` o pega sozinho, sem pedir login.
+   - **Antes de subir, rebuildar do zero** (`rm -rf build dist ekodide.egg-info`): dist
+     velho carrega código velho, e ninguém percebe até alguém instalar.
+   - **A próxima versão** (build/twine NÃO estão no sistema; venv descartável, fora do
+     repo pra não virar lixo — a máquina é magra e `/tmp` é tmpfs pequeno):
      ```bash
-     python3 -m venv .venv-build && .venv-build/bin/pip install -U build twine
+     # bumpar a version no pyproject.toml E no ekodide/__init__.py (os dois!)
+     python3 -m venv ~/.cache/ekodide-build
+     ~/.cache/ekodide-build/bin/pip install -U build twine
      rm -rf build dist ekodide.egg-info
-     .venv-build/bin/python -m build
-     .venv-build/bin/twine check dist/*
-     # ENSAIO opcional (conta/token SEPARADOS): twine upload --repository testpypi dist/*
-     # REAL (confirmar com o Matheus; pede o token pypi-... na hora):
-     .venv-build/bin/twine upload dist/*
+     ~/.cache/ekodide-build/bin/python -m build
+     ~/.cache/ekodide-build/bin/twine check dist/*
+     # confere que a peça nova entrou MESMO no pacote antes de subir:
+     ~/.cache/ekodide-build/bin/pip install dist/*.whl
+     ~/.cache/ekodide-build/bin/python -c "import ekodide; print(ekodide.__version__)"
+     # REAL (confirmar com o Matheus; o token sai do ~/.pypirc sozinho):
+     ~/.cache/ekodide-build/bin/twine upload dist/*
+     rm -rf ~/.cache/ekodide-build dist build ekodide.egg-info   # sem lixo
      ```
    - PEGADINHA: depois de publicada, **cada versão é imutável** — correção = bumpar
      `version` no `pyproject.toml` **e** no `ekodide/__init__.py` e subir nova.
