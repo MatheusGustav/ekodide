@@ -73,7 +73,9 @@ class MainActivity : Activity() {
             prefs.edit().putBoolean("acesso_total", aberto).apply()
             ServidorService.reconfigurar(this)
         }
-        if (prefs.getBoolean("setup_done", false)) mostrarHome()
+        // Escaneio vivo = acabamos de voltar da PERGUNTA da câmera (o diálogo pausa a
+        // Activity): não pintar a home por cima da tela de escanear.
+        if (escaneio == null && prefs.getBoolean("setup_done", false)) mostrarHome()
     }
 
     private fun pintar(coluna: LinearLayout) {
