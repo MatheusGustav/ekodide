@@ -49,6 +49,24 @@ def formatar(codigo: str) -> str:
     return f"{codigo[:5]}-{codigo[5:SORTEADOS]}-{codigo[SORTEADOS:]}"
 
 
+# O QR é só ROUPA pro mesmo código. O payload leva prefixo VERSIONADO pro scanner
+# recusar QR alheio (wifi, boleto, cardápio) sem precisar adivinhar.
+QR_PREFIXO = "ekodide-pair-1:"
+
+
+def qr_payload(codigo: str) -> str:
+    """Veste um código canônico pro QR: prefixo versionado + código."""
+    return QR_PREFIXO + codigo
+
+
+def de_qr_payload(texto: str) -> str:
+    """Lê um QR escaneado: exige o prefixo da casa e devolve o código CANÔNICO.
+    QR que não é de pareamento do Ekodide é recusado pelo prefixo, sem adivinhação."""
+    if not texto.startswith(QR_PREFIXO):
+        raise ValueError("esse QR não é de pareamento do Ekodide")
+    return validar(texto[len(QR_PREFIXO):])
+
+
 def validar(texto: str) -> str:
     """Confere um código digitado/escaneado e devolve a forma canônica (a que se grava).
 

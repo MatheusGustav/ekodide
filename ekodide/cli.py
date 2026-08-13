@@ -234,25 +234,70 @@ def _cmd_devices(args) -> int:
     return 0
 
 
-def _cmd_pair(args) -> int:
-    cfg = config.carregar()
-    if args.frase:  # esta ponta RECEBE o código mostrado pela outra
-        try:
-            cfg["segredo"] = frase.validar(args.frase)
-        except ValueError:
-            # formato antigo (frase livre) ainda passa aqui — morre na Etapa C do TODO #5
-            cfg["segredo"] = args.frase
-        config.salvar(cfg)
-        print(f"Pareado. Segredo guardado em {config.caminho()} (cadeado 600).")
-        return 0
-    # esta ponta SORTEIA o código e o mostra pra digitar na outra
-    novo = frase.gerar()
-    cfg["segredo"] = novo
+def _adotar_codigo(cfg: dict, texto: str) -> int:
+    """Adota um código vindo de outra tela. Só passa o formato SORTEADO com o
+    verificador batendo — 'definir a própria senha' não existe por construção."""
+    try:
+        cfg["segredo"] = frase.validar(texto)
+    except ValueError as erro:
+        print(f"Código recusado: {erro}", file=sys.stderr)
+        print("Código de pareamento é sempre SORTEADO (rode 'ekodide pair' na outra "
+              "ponta) — senha escolhida por humano cai em dicionário.", file=sys.stderr)
+        return 1
     config.salvar(cfg)
-    print("Código de pareamento sorteado e guardado AQUI. Digite-o no OUTRO aparelho:\n")
-    print(f"    ekodide pair {frase.formatar(novo)}\n")
-    print("Ele é o segredo (a chave do cadeado) — não trafega pela rede; passe pela")
-    print("tela/voz. Depois confira quem está on com:  ekodide devices")
+    print(f"Pareado. Segredo guardado em {config.caminho()} (cadeado 600).")
+    print("Confira quem está on com:  ekodide devices")
+    return 0
+
+
+def _desenhar_qr(payload: str) -> None:
+    """Desenha o QR no terminal. O QR é só ROUPA pro mesmo código; o extra é opcional —
+    sem ele, o código escrito já resolve: mostra a receita e segue (o padrão da casa)."""
+    try:
+        import qrcode
+    except ImportError:
+        print("(sem o desenho do QR — pra ganhá-lo:  pipx install 'ekodide[qr]')\n")
+        return
+    qr = qrcode.QRCode(border=1)
+    qr.add_data(payload)
+    qr.print_ascii(invert=True)
+    print()
+
+
+def _cmd_pair(args) -> int:
+    """UMA entrada estilo login: mostra o código deste lado (QR + escrito) e aceita
+    digitar um código vindo de outra tela. Quem sorteia é SEMPRE a máquina."""
+    cfg = config.carregar()
+    if args.codigo:  # veio digitado de outra tela (ou por script)
+        return _adotar_codigo(cfg, args.codigo)
+
+    atual = cfg.get("segredo")
+    mostra_atual = False
+    if atual and not args.novo:
+        try:
+            frase.validar(atual)
+            mostra_atual = True
+        except ValueError:
+            pass  # frase antiga de palavras (ou segredo manual): sorteia código novo
+    if mostra_atual:
+        codigo = atual
+        print("Este aparelho JÁ TEM código de pareamento — mostrando o atual, pra somar")
+        print("aparelho sem trocar a rede. (--novo sorteia outro e aposenta este.)\n")
+    else:
+        codigo = frase.gerar()
+        cfg["segredo"] = codigo
+        config.salvar(cfg)
+        print("Código de pareamento sorteado e guardado AQUI (cadeado 600).\n")
+
+    _desenhar_qr(frase.qr_payload(codigo))
+    print(f"    {frase.formatar(codigo)}\n")
+    print("No celular:  Parear com o computador → escaneie o QR (ou digite o código).")
+    print(f"Noutro PC:   ekodide pair {frase.formatar(codigo)}")
+    print("O código é o segredo — não trafega pela rede; vai pela tela, câmera ou dedos.")
+
+    digitado = _perguntar("\nVeio um código de OUTRA tela? Digite-o (Enter mantém o de cima): ")
+    if digitado:
+        return _adotar_codigo(cfg, digitado)
     return 0
 
 
@@ -273,7 +318,7 @@ def _perguntar(prompt: str) -> str:
     """input() que não estoura em terminal sem teclado (pipe/script): devolve ''."""
     try:
         return input(prompt).strip()
-    except EOFError:
+    except (EOFError, OSError):
         return ""
 
 
@@ -384,8 +429,11 @@ def construir_parser() -> argparse.ArgumentParser:
     d.add_argument("--tempo", type=float, default=2.5, help="segundos de escuta (padrão: 2.5)")
     d.set_defaults(func=_cmd_devices)
 
-    pr = sub.add_parser("pair", help="parear: sem código, sorteia e mostra; com código, adota o da outra ponta")
-    pr.add_argument("frase", nargs="?", help="o código de pareamento mostrado pelo outro aparelho")
+    pr = sub.add_parser("pair", help="parear: mostra o código deste lado (QR + escrito) ou adota um digitado")
+    pr.add_argument("codigo", nargs="?",
+                    help="código vindo de outra tela (sempre sorteado, com verificador)")
+    pr.add_argument("--novo", action="store_true",
+                    help="sorteia outro código (o antigo deixa de valer nas duas pontas)")
     pr.set_defaults(func=_cmd_pair)
 
     fw = sub.add_parser("firewall", help="checa/libera as portas do Ekodide (no lado que recebe)")

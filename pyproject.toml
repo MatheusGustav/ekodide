@@ -36,8 +36,11 @@ classifiers = [
 # A TOMADA MCP (ligar o Ekodide num agente de IA) é extra OPCIONAL: quem só quer
 # mandar arquivo não carrega o SDK do MCP junto, e o `ekodide mcp` recusa com a
 # receita de instalar em vez de estourar.
+# O QR do pareamento idem: `qrcode` é pura, gratuita e desenha em ASCII sem pillow —
+# sem o extra, `ekodide pair` mostra só o código escrito e a receita.
 [project.optional-dependencies]
 agente = ["mcp>=2"]
+qr = ["qrcode>=8"]  # a 8.x é dependência ZERO (a 7.x ainda puxava pypng)
 
 [project.urls]
 Homepage = "https://github.com/MatheusGustav/ekodide"

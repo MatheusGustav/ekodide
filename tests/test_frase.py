@@ -71,6 +71,24 @@ def test_caractere_confundivel_recusado_ensinando():
         frase.validar("K7TPO-XQ9FM-H")
 
 
+def test_qr_payload_ida_e_volta():
+    c = frase.gerar()
+    assert frase.qr_payload(c) == f"ekodide-pair-1:{c}"
+    assert frase.de_qr_payload(frase.qr_payload(c)) == c
+
+
+def test_qr_alheio_ou_torto_recusado():
+    # QR de wifi/boleto/cardápio: sem o prefixo da casa, recusa sem adivinhar
+    with pytest.raises(ValueError, match="não é de pareamento"):
+        frase.de_qr_payload("WIFI:T:WPA;S:casa;P:12345678;;")
+    # versão desconhecida do payload também não passa
+    with pytest.raises(ValueError):
+        frase.de_qr_payload("ekodide-pair-2:" + frase.gerar())
+    # prefixo certo com código corrompido: o verificador acusa
+    with pytest.raises(ValueError):
+        frase.de_qr_payload("ekodide-pair-1:AAAAAAAAAAA")
+
+
 def test_frase_antiga_de_palavras_recusada():
     # o formato velho (6 palavras) não passa; segredo antigo JÁ GRAVADO segue valendo
     # (é só string na config — ninguém revalida), mas não entra como pareamento novo

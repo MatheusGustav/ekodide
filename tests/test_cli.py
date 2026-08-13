@@ -68,7 +68,13 @@ def test_config_show_mascara_segredo(capsys):
     assert "super-secreto" not in saida and "guardado" in saida
 
 
-def test_pair_sorteia_codigo_e_a_outra_ponta_adota(capsys):
+@pytest.fixture()
+def sem_teclado(monkeypatch):
+    """pair sem ninguém digitando no prompt (Enter mantém o código mostrado)."""
+    monkeypatch.setattr(cli, "_perguntar", lambda prompt: "")
+
+
+def test_pair_sorteia_codigo_e_a_outra_ponta_adota(sem_teclado, capsys):
     from ekodide import frase
 
     # ponta A sorteia: o segredo canônico fica guardado e a saída mostra o código VESTIDO
@@ -82,6 +88,63 @@ def test_pair_sorteia_codigo_e_a_outra_ponta_adota(capsys):
     # ponta B digita o código vestido (com traços): guarda o MESMO segredo canônico
     assert cli.main(["pair", frase.formatar(codigo)]) == 0
     assert config.carregar()["segredo"] == codigo
+
+
+def test_pair_de_novo_mostra_o_mesmo_codigo_pra_somar_aparelho(sem_teclado, capsys):
+    from ekodide import frase
+
+    assert cli.main(["pair"]) == 0
+    codigo = config.carregar()["segredo"]
+    capsys.readouterr()
+
+    # segunda vez NÃO troca o segredo: mostra o atual (somar aparelho sem trocar a rede)
+    assert cli.main(["pair"]) == 0
+    assert config.carregar()["segredo"] == codigo
+    saida = capsys.readouterr().out
+    assert frase.formatar(codigo) in saida and "JÁ TEM" in saida
+
+    # --novo sorteia outro e aposenta o antigo
+    assert cli.main(["pair", "--novo"]) == 0
+    assert config.carregar()["segredo"] != codigo
+
+
+def test_pair_aposenta_frase_antiga_de_palavras(sem_teclado, capsys):
+    from ekodide import frase
+
+    cli.main(["config", "segredo", "casa-vento-rio-azul-pedra-lobo"])
+    capsys.readouterr()
+    assert cli.main(["pair"]) == 0  # não é código sorteado: sorteia um novo
+    novo = config.carregar()["segredo"]
+    assert novo == frase.validar(novo)
+
+
+def test_pair_texto_livre_morre(sem_teclado, capsys):
+    # 'definir a própria senha' deixou de existir: só passa código sorteado
+    cli.main(["config", "segredo", "segredo-legado"])
+    capsys.readouterr()
+    assert cli.main(["pair", "minha-senha-esperta"]) == 1
+    assert config.carregar()["segredo"] == "segredo-legado"  # intocado
+    err = capsys.readouterr().err
+    assert "recusado" in err and "SORTEADO" in err
+
+
+def test_pair_prompt_adota_codigo_de_outra_tela(monkeypatch, capsys):
+    from ekodide import frase
+
+    # o prompt estilo login: digitou um código vestido vindo de outra tela, adota ELE
+    de_fora = frase.gerar()
+    monkeypatch.setattr(cli, "_perguntar", lambda prompt: frase.formatar(de_fora).lower())
+    assert cli.main(["pair"]) == 0
+    assert config.carregar()["segredo"] == de_fora
+
+
+def test_pair_sem_extra_qr_mostra_a_receita(sem_teclado, capsys):
+    import importlib.util
+
+    if importlib.util.find_spec("qrcode"):
+        pytest.skip("extra [qr] instalado — este teste cobre o caminho SEM ele")
+    assert cli.main(["pair"]) == 0
+    assert "ekodide[qr]" in capsys.readouterr().out
 
 
 def test_config_nome_grava(capsys):
