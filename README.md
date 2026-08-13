@@ -152,6 +152,18 @@ Puxar é **opt-in**: só funciona contra quem serviu com `--compartilhar`. O con
 volta cifrado (cofre) e lacrado (HMAC), e a pasta compartilhada é **cercada** — um
 pedido com `../` nunca escapa dela.
 
+**Navegar pelas pastas do celular** (`--pasta`): com o app Android e o **acesso a
+todos os arquivos** concedido (o wizard leva na tela do sistema), o PC navega o
+armazenamento em vista **rasa** — um nível por vez, como um `ls` remoto:
+```bash
+ekodide list --de celular --pasta ""              # raiz do armazenamento
+ekodide list --de celular --pasta "DCIM/Camera"   # desce um nível por vez
+ekodide pull IMG_001.jpg --de celular --pasta "DCIM/Camera"
+```
+Sem a permissão — e contra um servidor de PC, sempre — pedido com `--pasta` é
+recusado explícito (403 com motivo), nunca a pasta errada calada. `Android/data` e
+`Android/obb` são barradas em código, e vale a mesma cerca (travessia/symlink).
+
 ### `config` — ajustar
 ```bash
 ekodide config show                          # ver segredo (mascarado) e destinos

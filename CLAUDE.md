@@ -204,6 +204,11 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
 
 ## Notas de campo
 
+- **2026-08-13:** a **navegação por pastas** (commit `5ca5ab2` de 10/07, que morava
+  órfão na branch `app`) entrou na main por cherry-pick: campo `pasta` no
+  `/listar`/`/buscar`, `list/pull --pasta` na CLI, `FonteAberta` no app (atrás do
+  "acesso a todos os arquivos"; sem ele, 403 explícito — PC servindo recusa sempre).
+  A branch `app` foi apagada depois do CI verde. Ainda NÃO publicado no PyPI.
 - **2026-06-20:** mp4/mp3 chegam byte-idênticos (teste automatizado, inclusive picado);
   retomada após queda; keep-alive + pedaço 16 MB; **cifra AES-256-GCM** provada em
   laboratório (teste que espiona a rede: conteúdo não vai em claro) **e** PC↔PC em 2
