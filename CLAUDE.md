@@ -78,9 +78,10 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
    - **Versões no ar:** `0.1.0` (21/06/2026, a primeira usável), `0.1.1` (11/08/2026,
      que somou o `espiar` — ver `buscador.py`), `0.2.0` (11/08/2026, a tomada MCP) e
      `0.3.0` (13/08/2026, o pareamento por código curto + QR — TODO #5; o `pair` de
-     texto livre morreu aqui). Quem depende do `espiar` pede `ekodide>=0.1.1`; quem
-     quer a tomada instala o extra `ekodide[agente]>=0.2`; o QR no terminal é
-     `ekodide[qr]>=0.3`.
+     texto livre morreu aqui) e `0.4.0` (13/08/2026, a navegação por pastas —
+     `list/pull --pasta`). Quem depende do `espiar` pede `ekodide>=0.1.1`; quem quer
+     a tomada instala o extra `ekodide[agente]>=0.2`; o QR no terminal é
+     `ekodide[qr]>=0.3`; o `--pasta` pede `>=0.4`.
    - **Credencial:** o token fica em `~/.pypirc` (`[pypi]`, `username = __token__`),
      nunca no repo. O `twine upload` o pega sozinho, sem pedir login.
    - **Antes de subir, rebuildar do zero** (`rm -rf build dist ekodide.egg-info`): dist
@@ -208,7 +209,7 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
   órfão na branch `app`) entrou na main por cherry-pick: campo `pasta` no
   `/listar`/`/buscar`, `list/pull --pasta` na CLI, `FonteAberta` no app (atrás do
   "acesso a todos os arquivos"; sem ele, 403 explícito — PC servindo recusa sempre).
-  A branch `app` foi apagada depois do CI verde. Ainda NÃO publicado no PyPI.
+  A branch `app` foi apagada depois do CI verde. Publicado no PyPI na `0.4.0`.
 - **2026-06-20:** mp4/mp3 chegam byte-idênticos (teste automatizado, inclusive picado);
   retomada após queda; keep-alive + pedaço 16 MB; **cifra AES-256-GCM** provada em
   laboratório (teste que espiona a rede: conteúdo não vai em claro) **e** PC↔PC em 2
