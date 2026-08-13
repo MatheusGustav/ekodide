@@ -1,56 +1,81 @@
 package com.ekodide.android.core
 
 import java.security.SecureRandom
+import java.util.Locale
 
 /**
- * A frase-código: um segredo forte que dá pra DIGITAR. Espelho do frase.py.
+ * O código de pareamento: um segredo forte que dá pra DIGITAR (e escanear). Espelho
+ * byte-a-byte do frase.py — os dois mudam JUNTOS.
  *
- * O segredo dos dois lados tem que ser o MESMO. Em vez de copiar uma chave aleatória
- * ("9f3a..."), geramos o segredo como uma FRASE de palavras simples
- * ('casa-vento-rio-azul-pedra-lobo'): forte o bastante e fácil de ditar/digitar.
+ * O segredo dos dois lados tem que ser o MESMO. Ele nasce como um CÓDIGO curto
+ * sorteado — 'K7TP3-XQ9FM-H' — e NUNCA cruza a rede: vai de um aparelho ao outro pela
+ * tela, câmera ou dedos (o "out-of-band" do pareamento). Quem sorteia é SEMPRE a
+ * máquina: senha humana cai em dicionário (dá pra testar offline contra um pacote
+ * lacrado capturado no Wi-Fi), sorteio não.
  *
- * A frase *é* o segredo (a chave do HMAC). Ela NUNCA cruza a rede — vai de um aparelho
- * ao outro pela boca/tela (um lê, o outro digita). É o "out-of-band" do pareamento. Por
- * isso aqui NÃO se normaliza nada: a frase é usada byte-a-byte como veio; mexer (caixa,
- * espaços) divergiria do outro lado e quebraria o lacre.
+ * A forma CANÔNICA do segredo é maiúscula e sem traço (11 caracteres: 10 sorteados +
+ * 1 verificador). Traço e caixa baixa são ROUPA de leitura: [validar] tira a roupa e
+ * devolve a forma canônica, e é ELA que se grava nas duas pontas — dali em diante o
+ * segredo é usado byte-a-byte, sem mexer.
  */
 object Frase {
 
-    // Lista de palavras curtas, sem acento (fáceis de ditar/digitar). IDÊNTICA ao
-    // frase.py: 164 palavras (~7,4 bits cada); 6 palavras dão ~44 bits — folgado pra
-    // parear numa LAN (o lacre ainda tem janela de 5 min + HMAC).
-    val PALAVRAS: List<String> = listOf(
-        "abelha", "agua", "anel", "areia", "arroz", "arvore", "asa", "aviao",
-        "bambu", "banana", "barco", "bicho", "bola", "bolo", "boto", "brisa",
-        "cabra", "cacto", "caju", "carro", "casa", "cavalo", "chave", "chuva",
-        "cobra", "copo", "corda", "couro", "dado", "dedo", "dente", "disco",
-        "doce", "dragao", "duna", "elefante", "erva", "escada", "espelho", "estrela",
-        "faca", "farol", "festa", "flor", "fogo", "folha", "forte", "fruta",
-        "galho", "ganso", "gato", "gelo", "gema", "gota", "grama", "gruta",
-        "harpa", "haste", "hera", "hino", "horta", "iate", "iglu", "ilha",
-        "indio", "ipe", "isca", "jacare", "janela", "jardim", "jarro", "jiboia",
-        "jogo", "joia", "juba", "lago", "lama", "leao", "leite", "lenha",
-        "livro", "lobo", "lua", "mar", "mato", "mel", "mesa", "milho",
-        "moeda", "monte", "mundo", "nabo", "navio", "nervo", "neve", "ninho",
-        "noite", "norte", "nuvem", "oasis", "olho", "ombro", "onca", "onda",
-        "ostra", "ouro", "ovo", "pao", "pato", "pedra", "peixe", "pena",
-        "pinha", "ponte", "porta", "quadra", "quati", "queijo", "quilo", "quintal",
-        "raiz", "rato", "rede", "rio", "rocha", "roda", "rosa", "rumo",
-        "sapo", "selva", "serra", "sino", "sol", "sopa", "suco", "sul",
-        "tatu", "teia", "telha", "terra", "tigre", "torre", "trem", "trilha",
-        "uniao", "unha", "urna", "ursa", "urso", "urubu", "uva", "uivo",
-        "vaca", "vale", "vela", "vento", "verao", "vidro", "vinho", "voo",
-        "zebra", "zinco", "zona", "ziper",
-    )
+    // 31 símbolos: maiúsculas + dígitos, SEM os confundíveis 0/O e 1/I/L. 10 sorteados
+    // dão 31^10 ≈ 2^49,5 (~50 bits). E 31 é primo: o verificador (soma ponderada
+    // mod 31) acusa GARANTIDO qualquer erro de um caractere e qualquer troca de
+    // vizinhos. IDÊNTICO ao frase.py.
+    const val ALFABETO = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+    const val SORTEADOS = 10           // caracteres sorteados (a força do segredo)
+    const val TAMANHO = SORTEADOS + 1  // + 1 verificador no fim
 
     // CSPRNG (igual ao secrets do Python): sorteio forte, não previsível.
     private val rng = SecureRandom()
 
-    /** Sorteia uma frase-código forte (segredo pronto pra usar nos dois lados). */
-    fun gerar(palavras: Int = 6, separador: String = "-"): String {
-        require(palavras >= 4) {
-            "uma frase fraca demais não pareia com segurança; use >= 4 palavras"
+    /** O caractere verificador do corpo: soma ponderada pela posição, mod 31. */
+    internal fun verificador(corpo: String): Char {
+        var soma = 0
+        corpo.forEachIndexed { i, c -> soma += (i + 1) * ALFABETO.indexOf(c) }
+        return ALFABETO[soma % ALFABETO.length]
+    }
+
+    /** Sorteia um código novo, já com o verificador — canônico, pronto pra guardar. */
+    fun gerar(): String {
+        val corpo = buildString {
+            repeat(SORTEADOS) { append(ALFABETO[rng.nextInt(ALFABETO.length)]) }
         }
-        return (0 until palavras).joinToString(separador) { PALAVRAS[rng.nextInt(PALAVRAS.size)] }
+        return corpo + verificador(corpo)
+    }
+
+    /**
+     * Veste um código canônico pra LEITURA: 'K7TP3-XQ9FM-H' (5 + 5 + verificador).
+     * O traço é só roupa — [validar] aceita com ou sem.
+     */
+    fun formatar(codigo: String): String =
+        "${codigo.take(5)}-${codigo.substring(5, SORTEADOS)}-${codigo.substring(SORTEADOS)}"
+
+    /**
+     * Confere um código digitado/escaneado e devolve a forma canônica (a que se grava).
+     *
+     * Aceita a roupa da leitura (traço, espaço, caixa baixa). Recusa com
+     * [IllegalArgumentException] de mensagem clara o que não é código sorteado:
+     * tamanho errado, caractere fora do alfabeto ou verificador que não bate — o erro
+     * de digitação é acusado NA HORA, em vez de quebrar o lacre em silêncio depois.
+     */
+    fun validar(texto: String): String {
+        // Locale.ROOT: uppercase sem regra de idioma (em turco 'i' viraria 'İ')
+        val canonico = texto.uppercase(Locale.ROOT).filterNot { it.isWhitespace() || it == '-' }
+        require(canonico.length == TAMANHO) {
+            "código de pareamento tem $TAMANHO caracteres " +
+                "($SORTEADOS sorteados + 1 verificador); vieram ${canonico.length}"
+        }
+        val fora = canonico.filterNot { it in ALFABETO }.toSortedSet()
+        require(fora.isEmpty()) {
+            "caractere que não existe em código de pareamento: ${fora.joinToString(", ")} " +
+                "(0/O e 1/I/L ficam fora de propósito, por parecidos — releia na tela)"
+        }
+        require(canonico.last() == verificador(canonico.dropLast(1))) {
+            "o verificador não bate — algum caractere saiu trocado; confira e digite de novo"
+        }
+        return canonico
     }
 }

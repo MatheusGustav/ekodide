@@ -236,18 +236,22 @@ def _cmd_devices(args) -> int:
 
 def _cmd_pair(args) -> int:
     cfg = config.carregar()
-    if args.frase:  # esta ponta RECEBE a frase ditada pela outra
-        cfg["segredo"] = args.frase
+    if args.frase:  # esta ponta RECEBE o código mostrado pela outra
+        try:
+            cfg["segredo"] = frase.validar(args.frase)
+        except ValueError:
+            # formato antigo (frase livre) ainda passa aqui — morre na Etapa C do TODO #5
+            cfg["segredo"] = args.frase
         config.salvar(cfg)
         print(f"Pareado. Segredo guardado em {config.caminho()} (cadeado 600).")
         return 0
-    # esta ponta GERA a frase e a mostra pra ditar na outra
-    nova = frase.gerar(palavras=args.palavras)
-    cfg["segredo"] = nova
+    # esta ponta SORTEIA o código e o mostra pra digitar na outra
+    novo = frase.gerar()
+    cfg["segredo"] = novo
     config.salvar(cfg)
-    print("Frase-código gerada e guardada AQUI. Digite-a no OUTRO aparelho:\n")
-    print(f"    ekodide pair {nova}\n")
-    print("Ela é o segredo (a chave do cadeado) — não trafega pela rede; passe pela")
+    print("Código de pareamento sorteado e guardado AQUI. Digite-o no OUTRO aparelho:\n")
+    print(f"    ekodide pair {frase.formatar(novo)}\n")
+    print("Ele é o segredo (a chave do cadeado) — não trafega pela rede; passe pela")
     print("tela/voz. Depois confira quem está on com:  ekodide devices")
     return 0
 
@@ -380,9 +384,8 @@ def construir_parser() -> argparse.ArgumentParser:
     d.add_argument("--tempo", type=float, default=2.5, help="segundos de escuta (padrão: 2.5)")
     d.set_defaults(func=_cmd_devices)
 
-    pr = sub.add_parser("pair", help="parear: sem frase, gera e mostra; com frase, recebe a do outro")
-    pr.add_argument("frase", nargs="?", help="a frase-código ditada pelo outro aparelho")
-    pr.add_argument("--palavras", type=int, default=6, help="tamanho da frase ao gerar (padrão: 6)")
+    pr = sub.add_parser("pair", help="parear: sem código, sorteia e mostra; com código, adota o da outra ponta")
+    pr.add_argument("frase", nargs="?", help="o código de pareamento mostrado pelo outro aparelho")
     pr.set_defaults(func=_cmd_pair)
 
     fw = sub.add_parser("firewall", help="checa/libera as portas do Ekodide (no lado que recebe)")
