@@ -32,7 +32,7 @@ from .recebedor import servir
 from .vizinhanca import anunciar, anunciar_em_thread, procurar
 from .frase import gerar as gerar_frase
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "enviar",

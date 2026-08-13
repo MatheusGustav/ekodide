@@ -76,9 +76,11 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
    funcionam, sem URL nenhuma. Publicado é publish pra fora → **confirmar com o Matheus
    antes** de todo `twine upload` novo.
    - **Versões no ar:** `0.1.0` (21/06/2026, a primeira usável), `0.1.1` (11/08/2026,
-     que somou o `espiar` — ver `buscador.py`) e `0.2.0` (11/08/2026, a tomada MCP).
-     Quem depende do `espiar` pede `ekodide>=0.1.1`; quem quer a tomada instala o
-     extra: `ekodide[agente]>=0.2`.
+     que somou o `espiar` — ver `buscador.py`), `0.2.0` (11/08/2026, a tomada MCP) e
+     `0.3.0` (13/08/2026, o pareamento por código curto + QR — TODO #5; o `pair` de
+     texto livre morreu aqui). Quem depende do `espiar` pede `ekodide>=0.1.1`; quem
+     quer a tomada instala o extra `ekodide[agente]>=0.2`; o QR no terminal é
+     `ekodide[qr]>=0.3`.
    - **Credencial:** o token fica em `~/.pypirc` (`[pypi]`, `username = __token__`),
      nunca no repo. O `twine upload` o pega sozinho, sem pedir login.
    - **Antes de subir, rebuildar do zero** (`rm -rf build dist ekodide.egg-info`): dist
