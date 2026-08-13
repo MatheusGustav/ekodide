@@ -44,8 +44,8 @@ class ServidorService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when {
-            // Pasta mudou: derruba e religa só o servidor pra reler a fonte (sem mexer
-            // nos locks/notificação que já estão de pé).
+            // Pasta ou segredo mudou: derruba e religa só o servidor pra reler as prefs
+            // (sem mexer nos locks/notificação que já estão de pé).
             intent?.action == ACAO_RECONFIGURAR -> reiniciarServidor()
             servidor == null -> ligar()
         }
@@ -152,7 +152,8 @@ class ServidorService : Service() {
             ctx.startForegroundService(Intent(ctx, ServidorService::class.java))
         }
 
-        /** Religa só o servidor pra aplicar uma pasta recém-escolhida (sem reiniciar tudo). */
+        /** Religa só o servidor pra aplicar o que mudou nas prefs — pasta recém-escolhida
+         *  ou código de pareamento adotado (sem reiniciar tudo). */
         fun reconfigurar(ctx: Context) {
             ctx.startForegroundService(
                 Intent(ctx, ServidorService::class.java).setAction(ACAO_RECONFIGURAR),

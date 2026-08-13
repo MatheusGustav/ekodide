@@ -199,7 +199,10 @@ class MainActivity : Activity() {
         raiz.addView(Estilo.espaco(this, 28f))
 
         // Selo de pareamento — o herói da tela.
-        raiz.addView(Estilo.selo(this, frase) { copiarFrase() })
+        raiz.addView(Estilo.selo(this, seloRotulo(), seloTexto(),
+            "Toque para copiar · serve também digitado no computador") { copiarFrase() })
+        raiz.addView(Estilo.espaco(this, 12f))
+        raiz.addView(Estilo.botaoFantasma(this, "Parear com o computador") { mostrarParear() })
         raiz.addView(Estilo.espaco(this, 16f))
 
         raiz.addView(Estilo.dado(this, "endereço na rede", "http://${ipLocal()}:${Recebedor.PORTA}"))
@@ -226,10 +229,80 @@ class MainActivity : Activity() {
         pintar(raiz)
     }
 
+    /** O segredo guardado é um código novo (canônico)? Se não, é a frase antiga de palavras. */
+    private fun ehCodigo(): Boolean = runCatching { Frase.validar(frase) }.isSuccess
+
+    private fun seloRotulo(): String =
+        if (ehCodigo()) "código de pareamento" else "frase de pareamento"
+
+    /** O segredo VESTIDO pra leitura: código com traços; a frase antiga, com "·". */
+    private fun seloTexto(): String =
+        if (ehCodigo()) Frase.formatar(frase) else frase.replace("-", "  ·  ")
+
     private fun copiarFrase() {
         val cb = getSystemService(ClipboardManager::class.java)
-        cb.setPrimaryClip(ClipData.newPlainText("frase Ekodide", frase))
-        Toast.makeText(this, "Frase copiada", Toast.LENGTH_SHORT).show()
+        cb.setPrimaryClip(
+            ClipData.newPlainText("código Ekodide", if (ehCodigo()) Frase.formatar(frase) else frase),
+        )
+        Toast.makeText(this, "Copiado", Toast.LENGTH_SHORT).show()
+    }
+
+    // ---------- Parear (o celular ADOTA o código do computador) ----------
+
+    /** A tela única de parear — por ora a metade DIGITADA; o botão de escanear chega
+     *  na Etapa D (TODO #5). Sentido novo: o PC mostra, o celular adota. */
+    private fun mostrarParear() {
+        val raiz = Estilo.raiz(this)
+        raiz.addView(Estilo.header(this, true))
+        raiz.addView(Estilo.espaco(this, 28f))
+
+        raiz.addView(Estilo.eyebrow(this, "pareamento", Estilo.NEVOA))
+        raiz.addView(Estilo.titulo(this, "Adotar o código do computador").also {
+            Estilo.margem(it, this, topo = 10f)
+        })
+        raiz.addView(
+            Estilo.corpo(
+                this,
+                "No computador, rode “ekodide pair”: ele sorteia e mostra um código. " +
+                    "Digite-o aqui — traço e caixa não importam. Os dois aparelhos passam " +
+                    "a usar o MESMO segredo, e o código de antes deixa de valer.",
+            ).also { Estilo.margem(it, this, topo = 14f) },
+        )
+        raiz.addView(Estilo.espaco(this, 24f))
+
+        val campo = Estilo.campoMono(this, "K7TP3-XQ9FM-H")
+        raiz.addView(campo)
+        val erro = Estilo.corpo(this, "").apply {
+            setTextColor(Estilo.MASK)
+            visibility = View.GONE
+        }
+        raiz.addView(erro.also { Estilo.margem(it, this, topo = 10f) })
+        raiz.addView(Estilo.espaco(this, 20f))
+
+        raiz.addView(Estilo.botaoPrimario(this, "Adotar este código") {
+            try {
+                adotarCodigo(campo.text.toString())
+            } catch (e: IllegalArgumentException) {
+                erro.text = e.message
+                erro.visibility = View.VISIBLE
+            }
+        })
+        raiz.addView(Estilo.botaoTexto(this, "Voltar") { mostrarHome() }.also {
+            Estilo.margem(it, this, topo = 8f)
+        })
+        pintar(raiz)
+    }
+
+    /** Valida (formato + verificador), regrava a pref e religa o servidor — lacre e
+     *  cofre derivam do segredo novo. Grava a forma CANÔNICA que `validar` devolve;
+     *  dali em diante ninguém mexe nela (byte-a-byte, aviso do Frase.kt). */
+    private fun adotarCodigo(texto: String) {
+        val canonico = Frase.validar(texto)
+        prefs.edit().putString("frase", canonico).apply()
+        frase = canonico
+        ServidorService.reconfigurar(this)
+        Toast.makeText(this, "Pareado — o serviço já usa o código novo", Toast.LENGTH_SHORT).show()
+        mostrarHome()
     }
 
     // ---------- Ações (abrem telas REAIS do sistema) ----------

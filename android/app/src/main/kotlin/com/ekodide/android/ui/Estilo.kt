@@ -5,11 +5,14 @@ import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -227,32 +230,53 @@ object Estilo {
     }
 
     /**
-     * O SELO de pareamento — elemento-assinatura. Bloco emoldurado em creme com a frase
-     * em monospace grande; toque copia. As palavras vêm separadas por "·".
+     * O SELO de pareamento — elemento-assinatura. Bloco emoldurado em creme com o valor
+     * em monospace grande; toque copia. Quem chama já manda o valor VESTIDO pra leitura
+     * (código com traços, ou a frase antiga com "·").
      */
-    fun selo(c: Context, frase: String, onCopiar: () -> Unit): LinearLayout = LinearLayout(c).apply {
-        orientation = LinearLayout.VERTICAL
-        background = arredondado(c, SUPERFICIE, MASK, 16f, 1.5f)
-        setPadding(dp(c, 20f), dp(c, 18f), dp(c, 20f), dp(c, 18f))
-        addView(eyebrow(c, "frase de pareamento", NEVOA))
-        addView(TextView(c).apply {
-            text = frase.replace("-", "  ·  ")
-            typeface = MONO
-            sp(20f)
-            setTextColor(MASK)
-            letterSpacing = 0.04f
-            setLineSpacing(dp(c, 6f).toFloat(), 1f)
-            setPadding(0, dp(c, 12f), 0, dp(c, 10f))
-        })
-        addView(TextView(c).apply {
-            text = "Toque para copiar · digite igual no computador"
-            typeface = Typeface.SANS_SERIF
-            sp(12f)
-            setTextColor(TRACO)
-        })
-        background = comRipple(c, arredondado(c, SUPERFICIE, MASK, 16f, 1.5f), 0x22E6DBC6)
-        isClickable = true
-        setOnClickListener { onCopiar() }
+    fun selo(c: Context, rotulo: String, valor: String, dica: String, onCopiar: () -> Unit): LinearLayout =
+        LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(c, 20f), dp(c, 18f), dp(c, 20f), dp(c, 18f))
+            addView(eyebrow(c, rotulo, NEVOA))
+            addView(TextView(c).apply {
+                text = valor
+                typeface = MONO
+                sp(20f)
+                setTextColor(MASK)
+                letterSpacing = 0.04f
+                setLineSpacing(dp(c, 6f).toFloat(), 1f)
+                setPadding(0, dp(c, 12f), 0, dp(c, 10f))
+            })
+            addView(TextView(c).apply {
+                text = dica
+                typeface = Typeface.SANS_SERIF
+                sp(12f)
+                setTextColor(TRACO)
+            })
+            background = comRipple(c, arredondado(c, SUPERFICIE, MASK, 16f, 1.5f), 0x22E6DBC6)
+            isClickable = true
+            setOnClickListener { onCopiar() }
+        }
+
+    /** Campo de entrada em monospace (o código de pareamento): hairline, caixa-alta,
+     *  sem sugestão de teclado — o que se digita é segredo, não frase de dicionário. */
+    fun campoMono(c: Context, dica: String): EditText = EditText(c).apply {
+        hint = dica
+        setHintTextColor(TRACO)
+        typeface = MONO
+        sp(18f)
+        setTextColor(MASK)
+        letterSpacing = 0.08f
+        isSingleLine = true
+        gravity = Gravity.CENTER
+        inputType = InputType.TYPE_CLASS_TEXT or
+            InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or
+            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        imeOptions = EditorInfo.IME_ACTION_DONE
+        background = arredondado(c, SUPERFICIE, PAINEL, 12f, 1.2f)
+        setPadding(dp(c, 16f), dp(c, 14f), dp(c, 16f), dp(c, 14f))
+        layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
     }
 
     /** Linha de dado dentro de um painel: eyebrow + valor mono. */
