@@ -78,6 +78,13 @@ Catálogo em `gradle/libs.versions.toml` (bumpar = uma linha).
   ✅ identidade visual "sentinela/console cifrado" (paleta do Matheus, design system
   `ui/Estilo`); ✅ APK de **release** assinado (chave fixa, sideload) — o CI sobe
   `ekodide-release-apk`. **App completo (Etapas 0–5).**
+- [x] **Etapa 6** — pareamento pelo PC (TODO #5 do `../CLAUDE.md`): o sentido virou
+  — o PC mostra (QR + código curto com verificador), o celular **adota**, escaneando
+  ou digitando. `core/Frase` refeito (espelho do `frase.py` novo, vetores-ouro);
+  tela de parear (digitar + scanner); `Escaneio.kt` = **CameraX + ZXing core** com
+  LifecycleOwner manual (a Activity segue crua); CAMERA pedida só na hora. Primeiras
+  dependências de runtime do app (zxing 3.5.3, camerax 1.4.2, lifecycle-runtime
+  2.8.7). **Falta a prova no aparelho real** (escanear o QR do fedora de verdade).
 
 > **Como retomar:** o miolo está em `app/src/main/kotlin/com/ekodide/android/{core,server}`,
 > espelhando os módulos Python homônimos em `../ekodide/`. Todo byte-exato é provado por

@@ -45,14 +45,16 @@ Quem recebe abre a caixa **na rede** (já se anuncia sozinho pros outros acharem
 ekodide serve --host 0.0.0.0
 ```
 
-Pareie o segredo **uma vez** — num aparelho gere a frase-código, no outro digite a mesma:
+Pareie o segredo **uma vez** — um lado mostra o código, o outro adota:
 ```bash
 # aparelho A:
-ekodide pair                       # mostra algo como: ekodide pair casa-vento-rio-azul-pedra-lobo
-# aparelho B (digite a MESMA frase que apareceu em A):
-ekodide pair casa-vento-rio-azul-pedra-lobo
+ekodide pair                       # sorteia e mostra: QR no terminal + o código, ex.: K7TP3-XQ9FM-H
+# aparelho B (digite o MESMO código que apareceu em A):
+ekodide pair K7TP3-XQ9FM-H
 ```
-A frase **é** o segredo — passe pela tela/voz, ela nunca trafega pela rede.
+No celular (app Ekodide): **Parear com o computador → escanear o QR** — ou digitar
+o mesmo código. O código **é** o segredo — vai pela tela, câmera ou voz; nunca
+trafega pela rede.
 
 Veja quem está disponível e envie **pelo nome** (o IP é descoberto sozinho, mesmo
 que mude por DHCP):
@@ -108,10 +110,15 @@ ekodide devices --tempo 4    # escuta por mais tempo (padrão: 2.5s)
 
 ### `pair` — combinar o segredo (sem inventar/digitar chave aleatória)
 ```bash
-ekodide pair                 # GERA uma frase-código, guarda e mostra pra ditar no outro
-ekodide pair casa-vento-rio-azul-pedra-lobo   # RECEBE a frase ditada pelo outro aparelho
-ekodide pair --palavras 8    # frase mais longa (mais forte) ao gerar
+ekodide pair                 # mostra o código deste lado: QR no terminal + escrito embaixo
+ekodide pair K7TP3-XQ9FM-H   # ADOTA um código vindo de outra tela (traço e caixa não importam)
+ekodide pair --novo          # sorteia OUTRO código (o antigo deixa de valer nas duas pontas)
 ```
+Quem sorteia é **sempre a máquina**: 10 caracteres + 1 verificador que acusa erro de
+digitação na hora, num alfabeto sem os confundíveis (0/O e 1/I/L). "Definir a própria
+senha" não existe de propósito — senha humana cai em dicionário, sorteio não. O
+desenho do QR no terminal vem com o extra opcional (`pipx install 'ekodide[qr]'`);
+sem ele, o código escrito resolve igual.
 
 ### `firewall` — liberar a entrada (no lado que recebe)
 ```bash
@@ -235,7 +242,8 @@ servir(Path("~/Downloads").expanduser(), segredo="...", host="0.0.0.0")
 Tem **app nativo** (Kotlin) que põe o celular como **ponta passiva** — recebe e deixa
 o PC puxar, falando o mesmo protocolo no fio (lacre + cofre, byte-idêntico). Roda em
 **segundo plano** (volta no boot), com **seletor de pasta** (SAF) e **pareamento por
-frase**. O código, o roadmap e como compilar/instalar estão em
+QR ou código digitado** (o PC mostra, o celular adota). O código, o roadmap e como
+compilar/instalar estão em
 [`android/`](android/README.md) — o APK sai como artefato a cada build no GitHub Actions.
 
 ## Como é por dentro
@@ -250,15 +258,15 @@ frase**. O código, o roadmap e como compilar/instalar estão em
 | `buscador.py` | PUXA arquivo de outra ponta (pede, decifra, grava reusando a caixa postal) |
 | `recebedor.py` | servidor HTTP leve que escuta e grava (e expõe /listar e /buscar pro puxar) |
 | `vizinhanca.py` | descoberta na LAN: anuncia presença e acha aparelhos pelo nome (sem IP) |
-| `frase.py` | gera o segredo como frase-código digitável (pareamento out-of-band) |
+| `frase.py` | sorteia o segredo como código curto digitável/escaneável, com verificador (pareamento out-of-band) |
 | `cortina.py` | detecta o firewall e monta/roda o comando pra liberar as portas |
 | `config.py` | lê/grava `~/.config/ekodide/config.json` (segredo + destinos + nome) |
 | `cli.py` | o comando `ekodide` (send/serve/list/pull/devices/pair/firewall/config) |
 
 ## Segurança (honesto)
 
-Duas camadas, ambas chaveadas pelo segredo que as pontas compartilham (a frase-código
-do pareamento — nunca trafega):
+Duas camadas, ambas chaveadas pelo segredo que as pontas compartilham (o código de
+pareamento — nunca trafega):
 
 - **Lacre (HMAC-SHA256):** prova *quem* mandou, que ninguém mexeu no caminho, e que a
   mensagem é recente (janela de 5 min).

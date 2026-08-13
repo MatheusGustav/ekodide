@@ -3,7 +3,7 @@
 O lacre (lacre.py) prova *quem* mandou e que nada foi adulterado, mas NÃO esconde:
 o conteúdo trafega à vista de quem estiver na mesma rede. O cofre fecha isso — cifra
 os bytes com AES-256-GCM (autenticado) usando uma chave derivada do MESMO segredo que
-as pontas já compartilham (a frase-código do pareamento). A chave nunca trafega; o
+as pontas já compartilham (o código de pareamento). A chave nunca trafega; o
 segredo também não. Na rede passa só embaralhado; o destino decifra e o arquivo
 gravado fica **byte-idêntico** ao original (decifrar é o inverso exato de cifrar).
 
