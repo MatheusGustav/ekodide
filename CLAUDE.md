@@ -70,7 +70,7 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
             # os da tomada PULAM sozinhos sem o extra: pip install -e '.[agente]'
 ```
 
-## TODO / próximos passos (atualizado 2026-06-20)
+## TODO / próximos passos (atualizado 2026-08-12)
 
 1. **Publicar no PyPI.** ✅ **FEITO.** `pip install ekodide` / `pipx install ekodide`
    funcionam, sem URL nenhuma. Publicado é publish pra fora → **confirmar com o Matheus
@@ -155,6 +155,35 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
    - **Se um dia:** ferramenta **opt-in e separada** (`ekodide video --faststart <arq>`),
      que avisa que gera arquivo novo (sha diferente, de propósito) e só roda com ffmpeg
      no PATH. Núcleo intocado.
+
+5. **Pareamento por QR (PLANEJADO 2026-08-12, pedido do Matheus Gustav).** O QR é só
+   outra ROUPA pra mesma frase-código — protocolo, portas, lacre e cofre não mudam.
+   - **O gap que ele fecha:** hoje quem dita a frase é o CELULAR — o app a gera no
+     primeiro uso e mostra no selo (`MainActivity.kt`), e **não tem como receber uma
+     frase de fora**. Com QR o sentido vira: **o PC mostra, o celular escaneia e
+     ADOTA** — alinhado com a filosofia do item 3 (admin dirige, celular passivo).
+   - **Segurança igual à de hoje:** o QR vai da tela do PC pra câmera do celular — a
+     frase segue out-of-band, nunca cruza a rede. Mesmo nível de quem dita/digita.
+   - **Etapa A — o app ADOTA frase (sem câmera).** Caminho novo no app: "colar
+     frase" (campo de texto), regrava a pref `frase` e reinicia o `ServidorService`
+     (lacre/cofre derivam do segredo novo). **SEM normalizar nada** — a frase é
+     byte-a-byte (aviso do `Frase.kt`); validação só avisa, não corrige. Vale
+     sozinha: é o fallback eterno do scanner, e já pareia PC→celular sem câmera.
+   - **Etapa B — a CLI mostra QR.** `ekodide pair --qr` desenha a MESMA frase como
+     QR no terminal. Payload com prefixo versionado (`ekodide-pair-1:<frase>`) pro
+     scanner recusar QR alheio. Dependência `qrcode` como **extra opcional**
+     (`ekodide[qr]`) — pura, gratuita, desenha em ASCII sem pillow; sem o extra,
+     recusa com receita (o padrão da casa). Gerar nova × mostrar a atual (somar um
+     3º aparelho sem trocar o segredo da rede) se decide na construção.
+   - **Etapa C — o scanner no app.** Botão "Escanear" → permissão CAMERA pedida só
+     na hora (hoje o manifest nem a declara) + leitor de QR desaguando no MESMO
+     caminho da Etapa A. Dependência: preferir o leve (ZXing core + CameraX) a
+     ML Kit — decidir na construção com a régua do "melhor possível, gratuito". É o
+     grosso do esforço (dias; A e B são horas).
+   - **Etapa D — ponta a ponta + docs.** Parear fedora↔celular por QR de verdade,
+     README e `pair --help` atualizados, este item marcado feito.
+   - Cada etapa fecha com commit. **A frase digitada CONTINUA existindo** — QR é
+     atalho, não substituto (o lubuntu não tem câmera pra escanear coisa nenhuma).
 
 ## Notas de campo
 
