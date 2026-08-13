@@ -159,8 +159,8 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
      que avisa que gera arquivo novo (sha diferente, de propósito) e só roda com ffmpeg
      no PATH. Núcleo intocado.
 
-5. **Pareamento por QR + código curto (PLANEJADO e EXECUTADO 2026-08-12 — etapas
-   A–D ✅; falta SÓ a prova física da Etapa E).** QR e código são só ROUPAS pro mesmo
+5. **Pareamento por QR + código curto — ✅ FEITO (planejado 2026-08-12, executado
+   e provado no aparelho real em 2026-08-13; no ar na `0.3.0`/`0.4.0`).** QR e código são só ROUPAS pro mesmo
    segredo — protocolo, portas, lacre e cofre não mudaram. **Quem sorteia é SEMPRE a
    máquina**: senha escolhida por humano fica de fora DE PROPÓSITO — quem está no
    mesmo Wi-Fi captura um pacote lacrado e testa senhas contra o HMAC offline, sem
@@ -191,11 +191,12 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
      tenta INVERTIDO (QR de terminal escuro). CAMERA pedida na hora; QR alheio é
      recusado pelo prefixo e o scanner segue. Desagua no MESMO `adotarCodigo` do
      digitado. CI verde (unit + emulador) na branch `pareamento-qr`.
-   - **Etapa E — docs ✅ / prova física PENDENTE.** README e `pair --help`
-     atualizados. **Falta (precisa de mãos):** parear fedora↔celular por QR de
-     verdade — instalar o APK novo (artefato do CI), `ekodide pair` no fedora,
-     escanear, e um `send`/`pull` pra provar o lacre com o segredo novo. Aí sim
-     marcar o item FEITO.
+   - **Etapa E ✅ — ponta a ponta provado (2026-08-13).** fedora↔Redmi pareado por
+     QR DE VERDADE (câmera do app → QR no terminal, `pair --novo` aposentou o
+     segredo do lubuntu). Com o segredo novo: `send` chegou lacrado; `--pasta` sem
+     o "acesso a todos os arquivos" levou o 403 explícito (o desenho); concedido,
+     `list --pasta DCIM/…` navegou e `pull` trouxe um mp4 de 4,4 MB decifrado.
+     README e `pair --help` atualizados.
    - **Nota de segurança que apressou isso:** o lubuntu foi DOADO (2026-08-12) e o
      segredo antigo pode ter ido junto na config dele. O primeiro `ekodide pair
      --novo` sorteia código novo e mata o velho. (O destino `lubuntu` saiu da config

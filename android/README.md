@@ -84,7 +84,8 @@ Catálogo em `gradle/libs.versions.toml` (bumpar = uma linha).
   tela de parear (digitar + scanner); `Escaneio.kt` = **CameraX + ZXing core** com
   LifecycleOwner manual (a Activity segue crua); CAMERA pedida só na hora. Primeiras
   dependências de runtime do app (zxing 3.5.3, camerax 1.4.2, lifecycle-runtime
-  2.8.7). **Falta a prova no aparelho real** (escanear o QR do fedora de verdade).
+  2.8.7). **Provado no aparelho real (13/08/2026):** QR do fedora escaneado pela
+  câmera, `send`/`pull --pasta` redondos com o segredo novo.
 
 > **Como retomar:** o miolo está em `app/src/main/kotlin/com/ekodide/android/{core,server}`,
 > espelhando os módulos Python homônimos em `../ekodide/`. Todo byte-exato é provado por
