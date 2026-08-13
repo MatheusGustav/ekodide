@@ -156,34 +156,53 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
      que avisa que gera arquivo novo (sha diferente, de propósito) e só roda com ffmpeg
      no PATH. Núcleo intocado.
 
-5. **Pareamento por QR (PLANEJADO 2026-08-12, pedido do Matheus Gustav).** O QR é só
-   outra ROUPA pra mesma frase-código — protocolo, portas, lacre e cofre não mudam.
-   - **O gap que ele fecha:** hoje quem dita a frase é o CELULAR — o app a gera no
-     primeiro uso e mostra no selo (`MainActivity.kt`), e **não tem como receber uma
-     frase de fora**. Com QR o sentido vira: **o PC mostra, o celular escaneia e
-     ADOTA** — alinhado com a filosofia do item 3 (admin dirige, celular passivo).
-   - **Segurança igual à de hoje:** o QR vai da tela do PC pra câmera do celular — a
-     frase segue out-of-band, nunca cruza a rede. Mesmo nível de quem dita/digita.
-   - **Etapa A — o app ADOTA frase (sem câmera).** Caminho novo no app: "colar
-     frase" (campo de texto), regrava a pref `frase` e reinicia o `ServidorService`
-     (lacre/cofre derivam do segredo novo). **SEM normalizar nada** — a frase é
-     byte-a-byte (aviso do `Frase.kt`); validação só avisa, não corrige. Vale
-     sozinha: é o fallback eterno do scanner, e já pareia PC→celular sem câmera.
-   - **Etapa B — a CLI mostra QR.** `ekodide pair --qr` desenha a MESMA frase como
-     QR no terminal. Payload com prefixo versionado (`ekodide-pair-1:<frase>`) pro
-     scanner recusar QR alheio. Dependência `qrcode` como **extra opcional**
-     (`ekodide[qr]`) — pura, gratuita, desenha em ASCII sem pillow; sem o extra,
-     recusa com receita (o padrão da casa). Gerar nova × mostrar a atual (somar um
-     3º aparelho sem trocar o segredo da rede) se decide na construção.
-   - **Etapa C — o scanner no app.** Botão "Escanear" → permissão CAMERA pedida só
-     na hora (hoje o manifest nem a declara) + leitor de QR desaguando no MESMO
-     caminho da Etapa A. Dependência: preferir o leve (ZXing core + CameraX) a
-     ML Kit — decidir na construção com a régua do "melhor possível, gratuito". É o
-     grosso do esforço (dias; A e B são horas).
-   - **Etapa D — ponta a ponta + docs.** Parear fedora↔celular por QR de verdade,
+5. **Pareamento por QR + código curto (PLANEJADO 2026-08-12; revisado no mesmo dia
+   com o Matheus Gustav).** QR e código são só ROUPAS pro mesmo segredo — protocolo,
+   portas, lacre e cofre não mudam. **Quem sorteia é SEMPRE a máquina**: senha
+   escolhida por humano fica de fora DE PROPÓSITO — quem está no mesmo Wi-Fi captura
+   um pacote lacrado e testa senhas contra o HMAC offline, sem limite de tentativas;
+   senha humana cai em dicionário, sorteio não.
+   - **O gap que fecha:** hoje quem dita a frase é o CELULAR — o app a gera no
+     primeiro uso e mostra no selo (`MainActivity.kt`), e **não tem como receber um
+     segredo de fora**. O sentido vira: **o PC mostra (QR + código), o celular
+     escaneia ou digita e ADOTA** — alinhado com o item 3 (admin dirige, celular
+     passivo). Out-of-band como sempre: o segredo vai de tela pra câmera/dedos,
+     nunca pela rede.
+   - **Etapa A — o código curto.** A frase de 6 palavras (~44 bits, ~30 chars) dá
+     lugar a um CÓDIGO de 10 caracteres sorteado de um alfabeto de 32 símbolos
+     (maiúsculas + dígitos, sem os confundíveis 0/O e 1/I/L) = ~50 bits com um terço
+     do tamanho — ex.: `K7TP3-XQ9FM`, o traço é só leitura — **+ 1 caractere
+     verificador** no fim: erro de digitação é acusado na hora, em vez de quebrar o
+     lacre em silêncio (as palavras davam isso de graça via lista; o verificador
+     repõe). `frase.py` e `Frase.kt` mudam JUNTOS (são espelhos). Segredo já pareado
+     continua valendo — é só string na config; muda como se sorteia/valida um novo.
+   - **Etapa B — o app ADOTA (a metade digitada da tela única).** Tela de parear no
+     app: campo de digitar (o botão de escanear chega na Etapa D). Valida formato +
+     verificador, regrava a pref `frase` e reinicia o `ServidorService` (lacre/cofre
+     derivam do segredo novo). **SEM normalizar nada** — byte-a-byte, aviso do
+     `Frase.kt`.
+   - **Etapa C — a CLI unificada.** `ekodide pair` vira UMA entrada estilo login:
+     sorteia código novo (ou mostra o atual, pra somar aparelho sem trocar a rede),
+     desenha o QR no terminal com o código escrito embaixo, e aceita digitar um
+     código vindo de outra tela. **O `pair <texto>` livre MORRE**: digitado só passa
+     no formato sorteado com verificador batendo — "definir a própria senha" deixa
+     de existir por construção. Payload do QR com prefixo versionado
+     (`ekodide-pair-1:<código>`) pro scanner recusar QR alheio. Dependência `qrcode`
+     como **extra opcional** (`ekodide[qr]`) — pura, gratuita, ASCII sem pillow; sem
+     o extra, mostra só o código e a receita (o padrão da casa).
+   - **Etapa D — o scanner no app.** Botão "Escanear" na tela da Etapa B → permissão
+     CAMERA pedida só na hora (o manifest nem a declara hoje) + leitor de QR
+     desaguando no MESMO caminho do digitado. Preferir o leve (ZXing core + CameraX)
+     a ML Kit — régua do "melhor possível, gratuito". É o grosso do esforço (dias;
+     A–C são horas).
+   - **Etapa E — ponta a ponta + docs.** Parear fedora↔celular por QR de verdade,
      README e `pair --help` atualizados, este item marcado feito.
-   - Cada etapa fecha com commit. **A frase digitada CONTINUA existindo** — QR é
-     atalho, não substituto (o lubuntu não tem câmera pra escanear coisa nenhuma).
+   - **Nota de segurança que apressa isso:** o lubuntu foi DOADO (2026-08-12) e o
+     segredo atual pode ter ido junto na config dele. O primeiro pareamento novo
+     sorteia código novo e mata o velho. (O destino `lubuntu` saiu da config do
+     fedora em 2026-08-12.)
+   - Cada etapa fecha com commit. **Digitar CONTINUA existindo** — é o fallback do
+     scanner e o único caminho PC↔PC (PC não escaneia tela de outro PC).
 
 ## Notas de campo
 
