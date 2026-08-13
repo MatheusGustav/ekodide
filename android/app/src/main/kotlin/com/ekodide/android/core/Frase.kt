@@ -53,6 +53,19 @@ object Frase {
     fun formatar(codigo: String): String =
         "${codigo.take(5)}-${codigo.substring(5, SORTEADOS)}-${codigo.substring(SORTEADOS)}"
 
+    // O QR é só ROUPA pro mesmo código. O payload leva prefixo VERSIONADO pro scanner
+    // recusar QR alheio (wifi, boleto, cardápio) sem adivinhar. IDÊNTICO ao frase.py.
+    const val QR_PREFIXO = "ekodide-pair-1:"
+
+    /** Veste um código canônico pro QR: prefixo versionado + código. */
+    fun qrPayload(codigo: String): String = QR_PREFIXO + codigo
+
+    /** Lê um QR escaneado: exige o prefixo da casa e devolve o código CANÔNICO. */
+    fun deQrPayload(texto: String): String {
+        require(texto.startsWith(QR_PREFIXO)) { "esse QR não é de pareamento do Ekodide" }
+        return validar(texto.substring(QR_PREFIXO.length))
+    }
+
     /**
      * Confere um código digitado/escaneado e devolve a forma canônica (a que se grava).
      *

@@ -56,6 +56,15 @@ android {
 dependencies {
     // Núcleo de cifra é Kotlin puro + javax.crypto: zero dependência de runtime.
 
+    // O olho do pareamento (Etapa D do TODO #5): ZXing core (decodificador de QR
+    // puro-Java) + CameraX. Régua do "melhor possível, gratuito" — ML Kit ficou de
+    // fora (pesado, amarrado ao Play Services).
+    implementation(libs.zxing.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.lifecycle.runtime) // o LifecycleRegistry do Escaneio
+
     // Testes JVM (rodam sem aparelho): provam o byte-idêntico contra os vetores-ouro.
     testImplementation(libs.junit)
 

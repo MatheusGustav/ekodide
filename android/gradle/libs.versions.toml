@@ -6,11 +6,21 @@ agp = "9.2.0"
 junit = "4.13.2"
 androidxTestExtJunit = "1.2.1"
 androidxTestRunner = "1.6.2"
+# O olho do pareamento (scanner de QR): ZXing core é decodificador puro-Java; CameraX
+# cuida da câmera. Versões estáveis conservadoras — bumpar quando der na telha.
+zxing = "3.5.3"
+camerax = "1.4.2"
+lifecycleRuntime = "2.8.7"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+androidx-lifecycle-runtime = { group = "androidx.lifecycle", name = "lifecycle-runtime", version.ref = "lifecycleRuntime" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

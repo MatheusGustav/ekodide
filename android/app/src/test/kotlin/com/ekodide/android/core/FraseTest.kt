@@ -82,6 +82,29 @@ class FraseTest {
     }
 
     @Test
+    fun qr_payload_ida_e_volta() {
+        val c = Frase.gerar()
+        assertEquals("ekodide-pair-1:$c", Frase.qrPayload(c))
+        assertEquals(c, Frase.deQrPayload(Frase.qrPayload(c)))
+    }
+
+    @Test
+    fun qr_alheio_ou_torto_recusado() {
+        // QR de wifi/boleto/cardápio: sem o prefixo da casa, recusa sem adivinhar
+        assertThrows(IllegalArgumentException::class.java) {
+            Frase.deQrPayload("WIFI:T:WPA;S:casa;P:12345678;;")
+        }
+        // versão desconhecida do payload também não passa
+        assertThrows(IllegalArgumentException::class.java) {
+            Frase.deQrPayload("ekodide-pair-2:" + Frase.gerar())
+        }
+        // prefixo certo com código corrompido: o verificador acusa
+        assertThrows(IllegalArgumentException::class.java) {
+            Frase.deQrPayload("ekodide-pair-1:AAAAAAAAAAA")
+        }
+    }
+
+    @Test
     fun frase_antiga_de_palavras_recusada() {
         // o formato velho (6 palavras) não passa como pareamento novo; segredo antigo
         // JÁ GRAVADO segue valendo (é só string na pref — ninguém revalida)

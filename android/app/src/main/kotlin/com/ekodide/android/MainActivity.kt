@@ -17,6 +17,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Toast
+import androidx.camera.view.PreviewView
 import com.ekodide.android.core.Frase
 import com.ekodide.android.server.Recebedor
 import com.ekodide.android.ui.Estilo
@@ -33,6 +34,7 @@ class MainActivity : Activity() {
 
     private val prefs by lazy { getSharedPreferences("ekodide", Context.MODE_PRIVATE) }
     private lateinit var frase: String
+    private var escaneio: Escaneio? = null
 
     private var passos: List<Passo> = emptyList()
     private var passoAtual = 0
@@ -249,8 +251,8 @@ class MainActivity : Activity() {
 
     // ---------- Parear (o celular ADOTA o código do computador) ----------
 
-    /** A tela única de parear — por ora a metade DIGITADA; o botão de escanear chega
-     *  na Etapa D (TODO #5). Sentido novo: o PC mostra, o celular adota. */
+    /** A tela ÚNICA de parear: escanear (o caminho principal) + digitar (o fallback,
+     *  e o único jeito PC↔PC). Sentido novo: o PC mostra, o celular adota. */
     private fun mostrarParear() {
         val raiz = Estilo.raiz(this)
         raiz.addView(Estilo.header(this, true))
@@ -263,34 +265,119 @@ class MainActivity : Activity() {
         raiz.addView(
             Estilo.corpo(
                 this,
-                "No computador, rode “ekodide pair”: ele sorteia e mostra um código. " +
-                    "Digite-o aqui — traço e caixa não importam. Os dois aparelhos passam " +
-                    "a usar o MESMO segredo, e o código de antes deixa de valer.",
+                "No computador, rode “ekodide pair”: ele mostra um QR com o código " +
+                    "escrito embaixo. Escaneie — ou digite o código; traço e caixa não " +
+                    "importam. Os dois aparelhos passam a usar o MESMO segredo, e o " +
+                    "código de antes deixa de valer.",
             ).also { Estilo.margem(it, this, topo = 14f) },
         )
         raiz.addView(Estilo.espaco(this, 24f))
 
+        raiz.addView(Estilo.botaoPrimario(this, "Escanear o QR do computador") { pedirEscanear() })
+        raiz.addView(Estilo.espaco(this, 20f))
+        raiz.addView(Estilo.eyebrow(this, "ou digite o código", Estilo.NEVOA))
+
         val campo = Estilo.campoMono(this, "K7TP3-XQ9FM-H")
-        raiz.addView(campo)
+        raiz.addView(campo.also { Estilo.margem(it, this, topo = 10f) })
         val erro = Estilo.corpo(this, "").apply {
             setTextColor(Estilo.MASK)
             visibility = View.GONE
         }
         raiz.addView(erro.also { Estilo.margem(it, this, topo = 10f) })
-        raiz.addView(Estilo.espaco(this, 20f))
 
-        raiz.addView(Estilo.botaoPrimario(this, "Adotar este código") {
+        raiz.addView(Estilo.botaoFantasma(this, "Adotar este código") {
             try {
                 adotarCodigo(campo.text.toString())
             } catch (e: IllegalArgumentException) {
                 erro.text = e.message
                 erro.visibility = View.VISIBLE
             }
-        })
+        }.also { Estilo.margem(it, this, topo = 16f) })
         raiz.addView(Estilo.botaoTexto(this, "Voltar") { mostrarHome() }.also {
             Estilo.margem(it, this, topo = 8f)
         })
         pintar(raiz)
+    }
+
+    // ---------- Escanear (o QR desagua no MESMO caminho do digitado) ----------
+
+    /** Câmera é pedida SÓ na hora de usar; sem ela, digitar resolve igual. */
+    private fun pedirEscanear() {
+        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            mostrarEscanear()
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.CAMERA), REQ_CAMERA)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_CAMERA) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                mostrarEscanear()
+            } else {
+                Toast.makeText(this, "Sem câmera dá igual: digite o código", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun mostrarEscanear() {
+        val raiz = Estilo.raiz(this)
+        raiz.addView(Estilo.header(this, true))
+        raiz.addView(Estilo.espaco(this, 24f))
+        raiz.addView(Estilo.eyebrow(this, "pareamento", Estilo.NEVOA))
+        raiz.addView(Estilo.titulo(this, "Escanear o QR").also {
+            Estilo.margem(it, this, topo = 10f)
+        })
+        raiz.addView(Estilo.corpo(this, "Aponte pro QR que o “ekodide pair” mostra no computador.")
+            .also { Estilo.margem(it, this, topo = 10f) })
+        raiz.addView(Estilo.espaco(this, 16f))
+
+        // COMPATIBLE (TextureView): SurfaceView briga com o ScrollView da raiz.
+        val tela = PreviewView(this).apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                Estilo.dp(this@MainActivity, 340f),
+            )
+        }
+        raiz.addView(tela)
+
+        val erro = Estilo.corpo(this, "").apply {
+            setTextColor(Estilo.MASK)
+            visibility = View.GONE
+        }
+        raiz.addView(erro.also { Estilo.margem(it, this, topo = 12f) })
+        raiz.addView(Estilo.espaco(this, 12f))
+        raiz.addView(Estilo.botaoTexto(this, "Voltar") { fecharEscaneio(); mostrarParear() })
+        pintar(raiz)
+
+        fecharEscaneio() // se havia um de antes, morre primeiro
+        escaneio = Escaneio(this) { texto ->
+            try {
+                adotarCodigo(Frase.deQrPayload(texto)) // o MESMO caminho do digitado
+                fecharEscaneio()
+                true
+            } catch (e: IllegalArgumentException) {
+                erro.text = e.message // QR alheio/torto: avisa e segue mirando
+                erro.visibility = View.VISIBLE
+                false
+            }
+        }.also { it.ligar(tela) }
+    }
+
+    private fun fecharEscaneio() {
+        escaneio?.parar()
+        escaneio = null
+    }
+
+    override fun onPause() {
+        fecharEscaneio() // tela foi embora = câmera solta (não fica aceso por trás)
+        super.onPause()
     }
 
     /** Valida (formato + verificador), regrava a pref e religa o servidor — lacre e
@@ -390,5 +477,6 @@ class MainActivity : Activity() {
     companion object {
         private const val REQ_NOTIF = 1
         private const val REQ_PASTA = 2
+        private const val REQ_CAMERA = 3
     }
 }
