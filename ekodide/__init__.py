@@ -21,6 +21,7 @@ from .buscador import ErroPuxar, espiar, puxar
 from .buscador import listar as listar_remoto
 from .caixa_postal import gravar_recebido, guardar, guardar_pedaco
 from .carteiro import EnvioResultado, enviar
+from .mala import MalaResultado, zipar
 from .lacre import (
     JANELA_SEGUNDOS,
     TrancaInvalida,
@@ -32,11 +33,13 @@ from .recebedor import servir
 from .vizinhanca import anunciar, anunciar_em_thread, procurar
 from .frase import gerar as gerar_frase
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "enviar",
     "EnvioResultado",
+    "zipar",
+    "MalaResultado",
     "puxar",
     "espiar",
     "listar_remoto",

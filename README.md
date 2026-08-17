@@ -102,6 +102,22 @@ ekodide send foto.jpg --para pc --descobrir          # acha o IP na rede (ignora
 senão (ou com `--descobrir`), acha o aparelho **pelo nome na rede**. O caminho é
 como no git: relativo à pasta atual.
 
+### `zipar` — juntar tudo num arquivo só
+```bash
+ekodide zipar ~/Fotos                     # a pasta vira 'Fotos.zip' ao lado dela
+ekodide zipar ~/Fotos -o /tmp/mala.zip    # escolhendo onde gravar
+ekodide zipar relatorio.pdf               # também vale pra arquivo solto
+```
+Pasta com 500 arquivinhos são 500 envios, cada um com sua ida e volta de rede.
+Fechada na mala, vira **um** envio: `ekodide zipar ~/Fotos && ekodide send ~/Fotos.zip
+--para pc`.
+
+É comando **à parte de propósito**: zipar muda os bytes, e byte-idêntico é pilar da
+casa — então isso nunca acontece sozinho dentro do `send`. Gera arquivo **novo** (o
+original fica intocado), **recusa** passar por cima de um `.zip` que já exista, e se
+der erro no meio não deixa mala pela metade no disco. Só biblioteca padrão do Python,
+zero dependência nova.
+
 ### `devices` — quem está na rede
 ```bash
 ekodide devices              # lista os aparelhos Ekodide que estão com a caixa aberta
@@ -265,6 +281,7 @@ compilar/instalar estão em
 | `lacre.py` | fechadura HMAC — o segredo nunca trafega |
 | `cofre.py` | cifra o conteúdo (AES-256-GCM) — embaralhado na rede, idêntico no destino |
 | `carteiro.py` | envia arquivo/pasta; arquivo grande vai **picado** em pedaços |
+| `mala.py` | junta pasta/arquivo num `.zip` só (fora do caminho do `send` — gera arquivo novo) |
 | `caixa_postal.py` | grava cercado (sem travessia, sem sobrescrever) e remonta os pedaços |
 | `acervo.py` | LÊ cercado a pasta compartilhada pro "puxar" (sem travessia, sem fuga por symlink) |
 | `buscador.py` | PUXA arquivo de outra ponta (pede, decifra, grava reusando a caixa postal) |
@@ -273,7 +290,7 @@ compilar/instalar estão em
 | `frase.py` | sorteia o segredo como código curto digitável/escaneável, com verificador (pareamento out-of-band) |
 | `cortina.py` | detecta o firewall e monta/roda o comando pra liberar as portas |
 | `config.py` | lê/grava `~/.config/ekodide/config.json` (segredo + destinos + nome) |
-| `cli.py` | o comando `ekodide` (send/serve/list/pull/devices/pair/firewall/config) |
+| `cli.py` | o comando `ekodide` (send/zipar/serve/list/pull/devices/pair/firewall/config) |
 
 ## Segurança (honesto)
 

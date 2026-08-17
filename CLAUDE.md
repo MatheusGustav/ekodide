@@ -15,6 +15,7 @@ Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do
 | `ekodide/lacre.py` | fechadura HMAC — o segredo NUNCA trafega (assina/verifica + janela de tempo) |
 | `ekodide/cofre.py` | cifra o CONTEÚDO (AES-256-GCM, chave via HKDF do segredo) — embaralha na rede, entrega byte-idêntico; depende de `cryptography` |
 | `ekodide/carteiro.py` | ENVIA arquivo/pasta; grande vai **picado**; **retoma** de onde parou + **keep-alive** (conexão reusada); devolve `EnvioResultado` neutro |
+| `ekodide/mala.py` | junta pasta/arquivo num `.zip` só (`ekodide zipar`) — só `zipfile` da stdlib; FORA do caminho do `send`, gera arquivo NOVO e nunca toca no original |
 | `ekodide/caixa_postal.py` | grava cercado (sem travessia/sobrescrita) e remonta pedaços (anota progresso no `.parcial.meta`) — pura, recebe a pasta `base` |
 | `ekodide/acervo.py` | LÊ cercado a pasta COMPARTILHADA pro "puxar" (sem `../`, sem fuga por symlink) — espelho de leitura do caixa_postal; pura |
 | `ekodide/buscador.py` | PUXA arquivo de outra ponta (`/listar` + `/buscar`); decifra e grava reusando a caixa postal — espelho do carteiro. Tem também o `espiar`: mesma viagem, mas os bytes ficam SÓ na memória (olhar ≠ puxar), com `limite` pra não trazer o arquivo inteiro |
@@ -23,7 +24,7 @@ Repo: https://github.com/MatheusGustav/ekodide · Licença: MIT · (extraído do
 | `ekodide/frase.py` | sorteia o segredo como código curto com verificador (pareamento out-of-band; o código É o segredo; QR/traço/caixa são só roupas) |
 | `ekodide/cortina.py` | detecta o firewall (firewalld/ufw) e monta/roda o comando pra liberar as portas (lado que recebe) |
 | `ekodide/config.py` | `~/.config/ekodide/config.json` (segredo + destinos + nome, cadeado 600) |
-| `ekodide/cli.py` | comando `ekodide` (`send` / `serve` / `list` / `pull` / `devices` / `pair` / `firewall` / `config` / `mcp`) |
+| `ekodide/cli.py` | comando `ekodide` (`send` / `zipar` / `serve` / `list` / `pull` / `devices` / `pair` / `firewall` / `config` / `mcp`) |
 | `ekodide/tomada.py` | a TOMADA MCP: expõe 5 ferramentas (enviar/listar/puxar/espiar/aparelhos) pra qualquer agente de IA. Casca fina sobre as peças de sempre; **extra opcional** (`ekodide[agente]`) |
 
 Modelo mental: **2 pontas** — quem RECEBE roda `serve` (caixa aberta), quem ENVIA
@@ -55,6 +56,13 @@ roda `send`. Uso completo no [README](README.md).
   do MCP entra como **extra opcional** (`ekodide[agente]`) pra não pesar em quem só
   quer mandar arquivo. Ele fala a API 2.0 (`mcp.server.MCPServer`) — a `fastmcp` da
   1.x não existe mais nesse caminho.
+- **"Conversor de arquivo": SÓ o zip; ffmpeg está FORA (decidido 2026-08-16 pelo
+  Matheus Gustav).** Compactar entra porque é `zipfile` da stdlib (zero dependência
+  nova), é reversível e resolve dor real: pasta com 500 arquivinhos são 500 envios,
+  zipada vira 1. Converter mídia (mp3→mp4 e afins) fica de fora e **não se propõe de
+  novo**: exigiria o ffmpeg, programa externo pesado, fora da régua da casa e da
+  máquina de 4 GB. E vale pro zip a mesma trava do TODO #4: comando à parte
+  (`ekodide zipar`), nunca automático dentro do `send`, sempre gerando arquivo novo.
 - **Puxar arquivo (em construção, 2026-06-20).** O admin pode PUXAR de outra ponta
   (rotas `/listar` + `/buscar` no recebedor; cliente `buscador.py`; leitura cercada em
   `acervo.py`). Exposição é **opt-in**: `serve --compartilhar <pasta>`, DESLIGADO por
@@ -66,7 +74,7 @@ roda `send`. Uso completo no [README](README.md).
 
 ```bash
 pipx install ekodide   # do PyPI; a pasta local em modo editável: pip install -e .
-pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada), puxar/espiar, config, cli, tomada, etc.
+pytest -q   # 137 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada), puxar/espiar, mala (zip), config, cli, tomada, etc.
             # os da tomada PULAM sozinhos sem o extra: pip install -e '.[agente]'
 ```
 
@@ -79,9 +87,10 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
      que somou o `espiar` — ver `buscador.py`), `0.2.0` (11/08/2026, a tomada MCP) e
      `0.3.0` (13/08/2026, o pareamento por código curto + QR — TODO #5; o `pair` de
      texto livre morreu aqui) e `0.4.0` (13/08/2026, a navegação por pastas —
-     `list/pull --pasta`). Quem depende do `espiar` pede `ekodide>=0.1.1`; quem quer
+     `list/pull --pasta`) e `0.5.0` (16/08/2026, a MALA — `ekodide zipar`).
+     Quem depende do `espiar` pede `ekodide>=0.1.1`; quem quer
      a tomada instala o extra `ekodide[agente]>=0.2`; o QR no terminal é
-     `ekodide[qr]>=0.3`; o `--pasta` pede `>=0.4`.
+     `ekodide[qr]>=0.3`; o `--pasta` pede `>=0.4`; o `zipar` pede `>=0.5`.
    - **Credencial:** o token fica em `~/.pypirc` (`[pypi]`, `username = __token__`),
      nunca no repo. O `twine upload` o pega sozinho, sem pedir login.
    - **Antes de subir, rebuildar do zero** (`rm -rf build dist ekodide.egg-info`): dist
@@ -206,6 +215,9 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
 
 ## Notas de campo
 
+- **2026-08-16:** entrou a **mala** (`mala.py` + `ekodide zipar`), publicada na
+  `0.5.0`. 11 testes novos. O conversor de mídia foi recusado na mesma conversa (ver
+  decisão travada acima) — o "conversor" do Ekodide é só o zip.
 - **2026-08-13:** a **navegação por pastas** (commit `5ca5ab2` de 10/07, que morava
   órfão na branch `app`) entrou na main por cherry-pick: campo `pasta` no
   `/listar`/`/buscar`, `list/pull --pasta` na CLI, `FonteAberta` no app (atrás do
@@ -222,6 +234,10 @@ pytest -q   # 113 testes: lacre, cofre, caixa, acervo, voo (envio+cifra+retomada
 
 ## Pra mim (Claude) — máquina do Matheus
 
+- **`test_vizinhanca.py::test_nada_na_rede_devolve_lista_vazia` falha se houver um
+  aparelho Ekodide VIVO na LAN** (visto em 16/08/2026: o celular respondeu ao
+  broadcast). Não é regressão — é o teste conversando com a rede de verdade. Confira
+  se o que falhou é só ele antes de sair caçando bug.
 - PC **fraquinho (4 GB de RAM)**: **NÃO** rodar testes de transferência de **vários GB**
   aqui (já travou a máquina 2x lendo arquivo inteiro pra RAM). O Ekodide é leve (processa
   em pedaços), mas teste que faz `read_bytes()` do arquivo todo estoura. Use arquivos

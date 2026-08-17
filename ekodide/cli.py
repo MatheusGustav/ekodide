@@ -5,6 +5,7 @@ endereços da config (~/.config/ekodide/), então funciona de qualquer pasta.
 
     ekodide send foto.png --para pc            # manda foto.png (da pasta atual) pro 'pc'
     ekodide send ~/Downloads/x --para celular  # arquivo ou pasta inteira
+    ekodide zipar ~/Fotos                      # junta a pasta num .zip só (envio único)
     ekodide serve                              # sobe a ponta que ESCUTA e grava
     ekodide config segredo <chave>             # guarda o segredo (cadeado 600)
     ekodide config destino pc http://IP:8778   # cadastra um destino
@@ -17,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import config, cortina, frase, vizinhanca
+from . import config, cortina, frase, mala, vizinhanca
 from .carteiro import enviar
 
 
@@ -87,6 +88,24 @@ def _cmd_send(args) -> int:
     r = enviar(origem, url, segredo)
     _falar_envio(r, origem, args.para)
     return 0 if r.ok else 1
+
+
+def _cmd_zipar(args) -> int:
+    """Fecha a mala: pasta (ou arquivo) vira UM .zip. Comando à parte de propósito —
+    zipar muda os bytes, então nunca acontece sozinho dentro do `send`."""
+    origem = Path(args.caminho).expanduser()
+    r = mala.zipar(origem, Path(args.saida).expanduser() if args.saida else None)
+    if not r.ok:
+        print(f"Não zipei: {r.erro}", file=sys.stderr)
+        if r.saida is not None and r.saida.exists():
+            print(f"  (escolha outro nome com:  ekodide zipar {args.caminho} -o <arquivo.zip>)",
+                  file=sys.stderr)
+        return 1
+    print(f"Fechei a mala: {r.saida}")
+    print(f"  {r.total} arquivo(s), {_tam_humano(r.bytes_origem)} → {_tam_humano(r.bytes_zip)}")
+    print("  (arquivo NOVO — os bytes são outros de propósito; o original ficou intacto)")
+    print(f"\nMande com:  ekodide send {r.saida} --para <aparelho>")
+    return 0
 
 
 def _cmd_serve(args) -> int:
@@ -426,6 +445,11 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("--descobrir", action="store_true",
                    help="acha o destino pela rede (ignora o IP da config — útil se mudou)")
     s.set_defaults(func=_cmd_send)
+
+    z = sub.add_parser("zipar", help="junta uma pasta (ou arquivo) num .zip só, pra ir num envio")
+    z.add_argument("caminho", help="pasta OU arquivo a empacotar (o original fica intacto)")
+    z.add_argument("-o", "--saida", help="onde gravar o .zip (padrão: ao lado, com o mesmo nome)")
+    z.set_defaults(func=_cmd_zipar)
 
     v = sub.add_parser("serve", help="sobe a ponta que escuta e grava o que chega")
     v.add_argument("--dir", help="pasta destino (padrão: config ou ~/Downloads)")
